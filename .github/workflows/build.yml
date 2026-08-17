@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - master
+      - mine
       - 'releases/**'
   pull_request:
   release:
