@@ -31,6 +31,10 @@ import SceneQueue, { QueuedScene } from "src/models/sceneQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
+import {
+  FEATURED_ADDED_AT_FIELD,
+  FEATURED_GROUP_ID,
+} from "src/components/Landing/featuredGroup";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
   getAbLoopPlugin,
@@ -283,6 +287,30 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   });
 
   async function onSave(input: GQL.SceneCreateInput) {
+    const hadFeatured = scene.groups.some(
+      (g) => g.group.id === FEATURED_GROUP_ID
+    );
+    const hasFeatured = (input.groups ?? []).some(
+      (g) => g.group_id === FEATURED_GROUP_ID
+    );
+
+    if (hasFeatured !== hadFeatured) {
+      const customFields: { [key: string]: unknown } = {
+        ...(input.custom_fields?.full ?? scene.custom_fields),
+      };
+
+      if (hasFeatured) {
+        customFields[FEATURED_ADDED_AT_FIELD] = new Date().toISOString();
+      } else {
+        delete customFields[FEATURED_ADDED_AT_FIELD];
+      }
+
+      input = {
+        ...input,
+        custom_fields: { full: customFields },
+      };
+    }
+
     await updateScene({
       variables: {
         input: {
