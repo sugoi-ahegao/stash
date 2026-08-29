@@ -127,6 +127,7 @@ const FeaturedSlide: React.FC<{
           to={`/scenes/${scene.id}`}
           className={cx("featured-slide-link", {
             "is-revealed": holding || revealed,
+            "is-complete": revealed,
           })}
         >
           <div
@@ -171,6 +172,7 @@ const FeaturedSlide: React.FC<{
           onHoldEnd={handleHoldEnd}
         />
       )}
+      {revealed && <div className="reveal-burst" />}
     </div>
   );
 };
