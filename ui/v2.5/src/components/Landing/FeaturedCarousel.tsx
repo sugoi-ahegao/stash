@@ -12,10 +12,11 @@ const FEATURED_COUNT = 10;
 const PREVIEW_DELAY_MS = 1000;
 const REVEAL_DURATION_MS = 900;
 
-const SlideGlass: React.FC<{
-  revealing: boolean;
+const SlideTeaser: React.FC<{
+  screenshot?: string | null;
+  hiding: boolean;
   onReveal: () => void;
-}> = ({ revealing, onReveal }) => {
+}> = ({ screenshot, hiding, onReveal }) => {
   const intl = useIntl();
 
   function handleReveal(e: React.SyntheticEvent) {
@@ -26,7 +27,7 @@ const SlideGlass: React.FC<{
 
   return (
     <div
-      className={cx("slide-glass", { "is-revealing": revealing })}
+      className={cx("slide-teaser", { "is-hiding": hiding })}
       role="button"
       tabIndex={0}
       onClick={handleReveal}
@@ -34,6 +35,12 @@ const SlideGlass: React.FC<{
         if (e.key === "Enter" || e.key === " ") handleReveal(e);
       }}
     >
+      <div
+        className="slide-teaser-bg"
+        style={
+          screenshot ? { backgroundImage: `url(${screenshot})` } : undefined
+        }
+      />
       <div className="slide-teaser-button">
         <div className="slide-teaser-ring" />
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -99,44 +106,49 @@ const FeaturedSlide: React.FC<{
 
   return (
     <div className="featured-slide">
-      <Link
-        to={`/scenes/${scene.id}`}
-        className={cx("featured-slide-link", { "is-revealed": revealing })}
-      >
-        <div
-          className="featured-slide-image"
-          style={
-            scene.paths.screenshot
-              ? { backgroundImage: `url(${scene.paths.screenshot})` }
-              : undefined
-          }
-        />
-        {scene.paths.preview && (
-          <video
-            ref={videoEl}
-            className={cx("featured-slide-video", {
-              "is-visible": showPreview,
-            })}
-            src={scene.paths.preview}
-            muted
-            loop
-            playsInline
-            preload="none"
+      <div className={cx("slide-reveal-clip", { "is-open": revealing })}>
+        <Link to={`/scenes/${scene.id}`} className="featured-slide-link">
+          <div
+            className="featured-slide-image"
+            style={
+              scene.paths.screenshot
+                ? { backgroundImage: `url(${scene.paths.screenshot})` }
+                : undefined
+            }
           />
-        )}
-        <div className="featured-slide-overlay" />
-        <div className="featured-slide-info">
-          {scene.studio && (
-            <div className="featured-slide-studio">{scene.studio.name}</div>
+          {scene.paths.preview && (
+            <video
+              ref={videoEl}
+              className={cx("featured-slide-video", {
+                "is-visible": showPreview,
+              })}
+              src={scene.paths.preview}
+              muted
+              loop
+              playsInline
+              preload="none"
+            />
           )}
-          <h2 className="featured-slide-title">{objectTitle(scene)}</h2>
-          {scene.date && (
-            <div className="featured-slide-date">{scene.date}</div>
-          )}
-        </div>
-      </Link>
+          <div className="featured-slide-overlay" />
+          <div className="featured-slide-info">
+            {scene.studio && (
+              <div className="featured-slide-studio">
+                {scene.studio.name}
+              </div>
+            )}
+            <h2 className="featured-slide-title">{objectTitle(scene)}</h2>
+            {scene.date && (
+              <div className="featured-slide-date">{scene.date}</div>
+            )}
+          </div>
+        </Link>
+      </div>
       {!revealed && (
-        <SlideGlass revealing={revealing} onReveal={handleReveal} />
+        <SlideTeaser
+          screenshot={scene.paths.screenshot}
+          hiding={revealing}
+          onReveal={handleReveal}
+        />
       )}
     </div>
   );
