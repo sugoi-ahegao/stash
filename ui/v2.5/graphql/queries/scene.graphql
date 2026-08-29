@@ -17,6 +17,31 @@ query FindScenes(
   }
 }
 
+query FindFeaturedScenes(
+  $filter: FindFilterType
+  $scene_filter: SceneFilterType
+) {
+  findScenes(filter: $filter, scene_filter: $scene_filter) {
+    scenes {
+      id
+      title
+      date
+      custom_fields
+      files {
+        path
+      }
+      studio {
+        id
+        name
+      }
+      paths {
+        screenshot
+        preview
+      }
+    }
+  }
+}
+
 query FindScenesByPathRegex($filter: FindFilterType) {
   findScenesByPathRegex(filter: $filter) {
     count
