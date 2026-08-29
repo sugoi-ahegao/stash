@@ -210,7 +210,22 @@ textarea.scene-description {
 .hide-thumbnails {
   .scene-card-preview-image,
   .scene-card-preview-video {
-    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .scene-card {
+    transition: background-color 0.2s ease;
+
+    &:hover,
+    &:active {
+      background-color: lighten($card-bg, 8%);
+
+      .scene-card-preview-image,
+      .scene-card-preview-video {
+        opacity: 1;
+      }
+    }
   }
 }
 
