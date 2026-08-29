@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Slider from "@ant-design/react-slick";
 import { Link } from "react-router-dom";
-import { useIntl } from "react-intl";
 import cx from "classnames";
 import * as GQL from "src/core/generated-graphql";
 import { LoadingIndicator } from "../Shared/LoadingIndicator";
@@ -10,45 +9,41 @@ import { FEATURED_ADDED_AT_FIELD, FEATURED_GROUP_ID } from "./featuredGroup";
 
 const FEATURED_COUNT = 10;
 const PREVIEW_DELAY_MS = 1000;
-const REVEAL_DURATION_MS = 900;
+const HOLD_DURATION_MS = 2000;
 
-const SlideTeaser: React.FC<{
-  screenshot?: string | null;
-  hiding: boolean;
-  onReveal: () => void;
-}> = ({ screenshot, hiding, onReveal }) => {
-  const intl = useIntl();
-
-  function handleReveal(e: React.SyntheticEvent) {
+const SlideGlass: React.FC<{
+  holding: boolean;
+  onHoldStart: () => void;
+  onHoldEnd: () => void;
+}> = ({ holding, onHoldStart, onHoldEnd }) => {
+  function startHold(e: React.SyntheticEvent) {
     e.preventDefault();
     e.stopPropagation();
-    onReveal();
+    onHoldStart();
   }
 
   return (
     <div
-      className={cx("slide-teaser", { "is-hiding": hiding })}
+      className={cx("slide-glass", { "is-holding": holding })}
       role="button"
       tabIndex={0}
-      onClick={handleReveal}
+      onMouseDown={startHold}
+      onMouseUp={onHoldEnd}
+      onMouseLeave={onHoldEnd}
+      onTouchStart={startHold}
+      onTouchEnd={onHoldEnd}
+      onTouchCancel={onHoldEnd}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") handleReveal(e);
+        if ((e.key === "Enter" || e.key === " ") && !e.repeat) startHold(e);
+      }}
+      onKeyUp={(e) => {
+        if (e.key === "Enter" || e.key === " ") onHoldEnd();
       }}
     >
-      <div
-        className="slide-teaser-bg"
-        style={
-          screenshot ? { backgroundImage: `url(${screenshot})` } : undefined
-        }
-      />
       <div className="slide-teaser-button">
-        <div className="slide-teaser-ring" />
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 5v14l11-7z" />
+          <path d="M12 17a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2 2 2 0 0 0 2 2m6-9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2h1V6a5 5 0 0 1 5-5 5 5 0 0 1 5 5v2zm-6-5a3 3 0 0 0-3 3v2h6V6a3 3 0 0 0-3-3z" />
         </svg>
-      </div>
-      <div className="slide-teaser-hint">
-        {intl.formatMessage({ id: "actions.click_to_reveal" })}
       </div>
     </div>
   );
@@ -73,25 +68,42 @@ const FeaturedSlide: React.FC<{
   active: boolean;
 }> = ({ scene, active }) => {
   const [showPreview, setShowPreview] = useState(false);
-  const [revealing, setRevealing] = useState(false);
+  const [holding, setHolding] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const videoEl = useRef<HTMLVideoElement>(null);
+  const holdTimer = useRef<number>();
 
-  function handleReveal() {
-    if (revealing) return;
-    setRevealing(true);
-    window.setTimeout(() => setRevealed(true), REVEAL_DURATION_MS);
+  function handleHoldStart() {
+    if (revealed || holdTimer.current) return;
+    setHolding(true);
+    holdTimer.current = window.setTimeout(() => {
+      setRevealed(true);
+    }, HOLD_DURATION_MS);
+  }
+
+  function handleHoldEnd() {
+    setHolding(false);
+    if (holdTimer.current) {
+      window.clearTimeout(holdTimer.current);
+      holdTimer.current = undefined;
+    }
   }
 
   useEffect(() => {
-    if (!active) {
+    return () => {
+      if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!active || !revealed) {
       setShowPreview(false);
       return;
     }
 
     const timer = setTimeout(() => setShowPreview(true), PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [active]);
+  }, [active, revealed]);
 
   useEffect(() => {
     if (showPreview) {
@@ -106,8 +118,17 @@ const FeaturedSlide: React.FC<{
 
   return (
     <div className="featured-slide">
-      <div className={cx("slide-reveal-clip", { "is-open": revealing })}>
-        <Link to={`/scenes/${scene.id}`} className="featured-slide-link">
+      <div
+        className={cx("slide-reveal-clip", {
+          "is-open": holding || revealed,
+        })}
+      >
+        <Link
+          to={`/scenes/${scene.id}`}
+          className={cx("featured-slide-link", {
+            "is-revealed": holding || revealed,
+          })}
+        >
           <div
             className="featured-slide-image"
             style={
@@ -144,10 +165,10 @@ const FeaturedSlide: React.FC<{
         </Link>
       </div>
       {!revealed && (
-        <SlideTeaser
-          screenshot={scene.paths.screenshot}
-          hiding={revealing}
-          onReveal={handleReveal}
+        <SlideGlass
+          holding={holding}
+          onHoldStart={handleHoldStart}
+          onHoldEnd={handleHoldEnd}
         />
       )}
     </div>

@@ -53,6 +53,7 @@
 
 .featured-slide {
   height: 90vh;
+  overflow: hidden;
   position: relative;
 
   @media (max-width: 576px) {
@@ -65,11 +66,22 @@
   display: block;
   height: 100%;
   position: relative;
+  transform: scale(1.06);
+  transition: transform 1s cubic-bezier(0.22, 1, 0.36, 1);
   width: 100%;
 
   &:hover {
     color: inherit;
     text-decoration: none;
+  }
+
+  // held down: slowly settle to full scale over the hold duration.
+  // released early: snap back to the zoomed-in resting state quickly -
+  // the base transition-duration above governs that reverse direction.
+  &.is-revealed {
+    transform: scale(1);
+    transition-duration: 2s;
+    transition-timing-function: linear;
   }
 }
 
@@ -146,53 +158,50 @@
   opacity: 0.75;
 }
 
-// the real slide content sits above the teaser and is masked down to a
-// point; clicking the teaser grows the mask into an iris opening.
-.slide-reveal-clip {
-  clip-path: circle(0% at 50% 50%);
-  height: 100%;
-  transition: clip-path 0.9s cubic-bezier(0.65, 0, 0.35, 1);
-  width: 100%;
-
-  &.is-open {
-    clip-path: circle(150% at 50% 50%);
-  }
-}
-
-.slide-teaser {
+// a static frosted glass panel sits over the real slide content
+// (rendered underneath, slightly zoomed in); the sharp content shows
+// through a growing circular window (.slide-reveal-clip) as you hold,
+// so the unblur reads as an iris opening rather than a uniform fade.
+.slide-glass {
   align-items: center;
+  backdrop-filter: blur(60px) brightness(0.85) saturate(1.1);
+  background-color: rgba(8, 12, 18, 0.25);
   bottom: 0;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
   justify-content: center;
   left: 0;
-  overflow: hidden;
   position: absolute;
   right: 0;
   top: 0;
-  transition: opacity 0.4s ease;
   z-index: 4;
-
-  &.is-hiding {
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.5s ease;
-  }
 }
 
-.slide-teaser-bg {
-  background-color: #12181f;
-  background-position: center;
-  background-size: cover;
-  filter: blur(24px) brightness(0.5) saturate(0.85);
+// the content wrapper: masked down to a point and blurred to match the
+// glass by default. Grows into a circle over the glass panel as the
+// lock is held, and its own blur clears at the same time - so what
+// shows through the aperture is genuinely coming into focus, not just
+// unmasked.
+.slide-reveal-clip {
+  clip-path: circle(0% at 50% 50%);
+  filter: blur(60px);
   height: 100%;
-  left: 0;
-  position: absolute;
-  top: 0;
-  transform: scale(1.15);
+  position: relative;
+  transition:
+    clip-path 1s cubic-bezier(0.42, 0, 1, 1),
+    filter 1s cubic-bezier(0.42, 0, 1, 1);
   width: 100%;
+  z-index: 5;
+
+  // held down: grow and clear steadily over the hold duration.
+  // released early: the base transition-duration above takes over and
+  // it closes/reblurs back down quickly.
+  &.is-open {
+    clip-path: circle(150% at 50% 50%);
+    filter: blur(0);
+    transition-duration: 2s;
+    transition-timing-function: linear;
+  }
 }
 
 .slide-teaser-button {
@@ -214,44 +223,21 @@
   svg {
     fill: #fff;
     height: 26px;
-    margin-left: 3px;
     width: 26px;
   }
 }
 
-.slide-teaser:hover .slide-teaser-button {
+.slide-teaser-button:hover {
   background: rgba(255, 255, 255, 0.2);
-  transform: scale(1.06);
+  transform: scale(0.92);
 }
 
-.slide-teaser-ring {
-  animation: slide-teaser-pulse 2.2s ease-out infinite;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50%;
-  bottom: -10px;
-  left: -10px;
-  position: absolute;
-  right: -10px;
-  top: -10px;
-}
-
-@keyframes slide-teaser-pulse {
-  0% {
-    opacity: 0.7;
-    transform: scale(0.85);
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.35);
-  }
-}
-
-.slide-teaser-hint {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  z-index: 1;
+// held down: grow steadily over the hold duration.
+// released early: the button's base transition-duration (above) takes
+// over and it snaps back down quickly.
+.slide-glass.is-holding .slide-teaser-button {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.5);
+  transition-duration: 2s;
+  transition-timing-function: linear;
 }
