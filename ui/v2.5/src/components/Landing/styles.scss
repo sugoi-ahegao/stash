@@ -222,6 +222,12 @@
   right: 0;
   top: 0;
   z-index: 4;
+
+  // today's unlock limit has been reached - still visible, just not
+  // interactive (no text/badge, just the cursor affordance).
+  &.is-locked-out {
+    cursor: not-allowed;
+  }
 }
 
 // the content wrapper: masked down to a point and blurred to match the

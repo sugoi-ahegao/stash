@@ -26,6 +26,7 @@ query FindFeaturedScenes(
       id
       title
       date
+      rating100
       custom_fields
       files {
         path
@@ -38,7 +39,19 @@ query FindFeaturedScenes(
         screenshot
         preview
       }
+      groups {
+        scene_index
+        group {
+          id
+        }
+      }
     }
+  }
+}
+
+query CountScenesByCustomField($scene_filter: SceneFilterType) {
+  findScenes(filter: { per_page: 0 }, scene_filter: $scene_filter) {
+    count
   }
 }
 

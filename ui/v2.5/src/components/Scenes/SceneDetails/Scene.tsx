@@ -11,6 +11,7 @@ import { useHistory, RouteComponentProps } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import * as GQL from "src/core/generated-graphql";
 import {
+  mutateMetadataGenerate,
   mutateMetadataScan,
   useFindScene,
   useSceneIncrementO,
@@ -34,6 +35,7 @@ import { OrganizedButton } from "./OrganizedButton";
 import {
   FEATURED_ADDED_AT_FIELD,
   FEATURED_GROUP_ID,
+  FEATURE_UNLOCKED_AT_FIELD,
 } from "src/components/Landing/featuredGroup";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
@@ -303,6 +305,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         customFields[FEATURED_ADDED_AT_FIELD] = new Date().toISOString();
       } else {
         delete customFields[FEATURED_ADDED_AT_FIELD];
+        delete customFields[FEATURE_UNLOCKED_AT_FIELD];
       }
 
       input = {
@@ -319,6 +322,25 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         },
       },
     });
+
+    if (hasFeatured && !hadFeatured) {
+      // same defaults as the manual Generate dialog - overwrite is left
+      // unset so existing thumbnails/previews/etc. aren't regenerated.
+      mutateMetadataGenerate({
+        sceneIDs: [scene.id],
+        sprites: true,
+        phashes: true,
+        previews: true,
+        covers: true,
+        markers: true,
+        previewOptions: {
+          previewSegments: 0,
+          previewSegmentDuration: 0,
+          previewPreset: GQL.PreviewPreset.Slow,
+        },
+      }).catch(() => {});
+    }
+
     Toast.success(
       intl.formatMessage(
         { id: "toast.updated_entity" },

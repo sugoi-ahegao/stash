@@ -1,11 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Slider from "@ant-design/react-slick";
 import { Link } from "react-router-dom";
 import cx from "classnames";
 import * as GQL from "src/core/generated-graphql";
+import { useSceneUpdate } from "src/core/StashService";
 import { LoadingIndicator } from "../Shared/LoadingIndicator";
 import { objectTitle } from "src/core/files";
-import { FEATURED_ADDED_AT_FIELD, FEATURED_GROUP_ID } from "./featuredGroup";
+import {
+  FEATURED_ADDED_AT_FIELD,
+  FEATURED_GROUP_ID,
+  FEATURE_UNLOCKED_AT_FIELD,
+} from "./featuredGroup";
+import {
+  canUnlockMore,
+  shouldRemoveFromFeatured,
+  startOfToday,
+} from "./featuredPolicy";
 
 const FEATURED_COUNT = 10;
 const PREVIEW_DELAY_MS = 1000;
@@ -13,9 +23,10 @@ const HOLD_DURATION_MS = 2000;
 
 const SlideGlass: React.FC<{
   holding: boolean;
+  locked: boolean;
   onHoldStart: () => void;
   onHoldEnd: () => void;
-}> = ({ holding, onHoldStart, onHoldEnd }) => {
+}> = ({ holding, locked, onHoldStart, onHoldEnd }) => {
   function startHold(e: React.SyntheticEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -24,7 +35,10 @@ const SlideGlass: React.FC<{
 
   return (
     <div
-      className={cx("slide-glass", { "is-holding": holding })}
+      className={cx("slide-glass", {
+        "is-holding": holding,
+        "is-locked-out": locked,
+      })}
       role="button"
       tabIndex={0}
       onMouseDown={startHold}
@@ -66,18 +80,38 @@ function byFeaturedAddedAt(a: FeaturedScene, b: FeaturedScene) {
 const FeaturedSlide: React.FC<{
   scene: FeaturedScene;
   active: boolean;
-}> = ({ scene, active }) => {
+  canUnlock: boolean;
+  onUnlock: () => void;
+}> = ({ scene, active, canUnlock, onUnlock }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [holding, setHolding] = useState(false);
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(
+    () => !!scene.custom_fields[FEATURE_UNLOCKED_AT_FIELD]
+  );
+  const [justUnlocked, setJustUnlocked] = useState(false);
   const videoEl = useRef<HTMLVideoElement>(null);
   const holdTimer = useRef<number>();
+  const [updateScene] = useSceneUpdate();
 
   function handleHoldStart() {
-    if (revealed || holdTimer.current) return;
+    if (revealed || holdTimer.current || !canUnlock) return;
     setHolding(true);
     holdTimer.current = window.setTimeout(() => {
       setRevealed(true);
+      setJustUnlocked(true);
+      onUnlock();
+      updateScene({
+        variables: {
+          input: {
+            id: scene.id,
+            custom_fields: {
+              partial: {
+                [FEATURE_UNLOCKED_AT_FIELD]: new Date().toISOString(),
+              },
+            },
+          },
+        },
+      }).catch(() => {});
     }, HOLD_DURATION_MS);
   }
 
@@ -127,7 +161,7 @@ const FeaturedSlide: React.FC<{
           to={`/scenes/${scene.id}`}
           className={cx("featured-slide-link", {
             "is-revealed": holding || revealed,
-            "is-complete": revealed,
+            "is-complete": justUnlocked,
           })}
         >
           <div
@@ -168,17 +202,21 @@ const FeaturedSlide: React.FC<{
       {!revealed && (
         <SlideGlass
           holding={holding}
+          locked={!canUnlock}
           onHoldStart={handleHoldStart}
           onHoldEnd={handleHoldEnd}
         />
       )}
-      {revealed && <div className="reveal-burst" />}
+      {justUnlocked && <div className="reveal-burst" />}
     </div>
   );
 };
 
 export const FeaturedCarousel: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [unlockedThisSession, setUnlockedThisSession] = useState(0);
+  const [updateScene] = useSceneUpdate();
+  const removedRef = useRef<Set<string>>(new Set());
 
   const { data, loading } = GQL.useFindFeaturedScenesQuery({
     variables: {
@@ -196,10 +234,66 @@ export const FeaturedCarousel: React.FC = () => {
     },
   });
 
-  const scenes = (data?.findScenes.scenes ?? [])
-    .slice()
-    .sort(byFeaturedAddedAt)
-    .slice(0, FEATURED_COUNT);
+  // how many scenes have been unlocked today, library-wide - not just the
+  // ones still in the featured group (a scene can be unlocked and later
+  // removed by policy, but it should still count against today's limit).
+  const { data: unlockedTodayData } = GQL.useCountScenesByCustomFieldQuery({
+    variables: {
+      scene_filter: {
+        custom_fields: [
+          {
+            field: FEATURE_UNLOCKED_AT_FIELD,
+            modifier: GQL.CriterionModifier.GreaterThan,
+            value: [startOfToday().toISOString()],
+          },
+        ],
+      },
+    },
+  });
+  const unlockedToday =
+    (unlockedTodayData?.findScenes.count ?? 0) + unlockedThisSession;
+  const canUnlock = canUnlockMore(unlockedToday);
+
+  const scenes = useMemo(
+    () =>
+      (data?.findScenes.scenes ?? [])
+        .slice()
+        .sort(byFeaturedAddedAt)
+        .slice(0, FEATURED_COUNT),
+    [data]
+  );
+
+  // lazily enforce the removal rules (rated, or unlocked-and-unrated past
+  // the expiry window) whenever the featured list loads/changes. This
+  // only runs when someone actually visits the carousel - there's no
+  // background job sweeping it on a schedule.
+  useEffect(() => {
+    const now = new Date();
+    for (const scene of scenes) {
+      if (removedRef.current.has(scene.id)) continue;
+      if (!shouldRemoveFromFeatured(scene, now)) continue;
+
+      removedRef.current.add(scene.id);
+      updateScene({
+        variables: {
+          input: {
+            id: scene.id,
+            groups: scene.groups
+              .filter((g) => g.group.id !== FEATURED_GROUP_ID)
+              .map((g) => ({
+                group_id: g.group.id,
+                scene_index: g.scene_index,
+              })),
+            custom_fields: {
+              remove: [FEATURED_ADDED_AT_FIELD, FEATURE_UNLOCKED_AT_FIELD],
+            },
+          },
+        },
+      }).catch(() => {
+        removedRef.current.delete(scene.id);
+      });
+    }
+  }, [scenes, updateScene]);
 
   if (loading) {
     return <LoadingIndicator />;
@@ -216,7 +310,7 @@ export const FeaturedCarousel: React.FC = () => {
         arrows
         infinite
         autoplay
-        autoplaySpeed={6000}
+        autoplaySpeed={10000}
         speed={600}
         fade
         pauseOnHover
@@ -229,7 +323,12 @@ export const FeaturedCarousel: React.FC = () => {
           // width/display inline styles onto it - nest the real slide
           // markup one level deeper so those styles don't clobber ours.
           <div key={scene.id}>
-            <FeaturedSlide scene={scene} active={index === activeIndex} />
+            <FeaturedSlide
+              scene={scene}
+              active={index === activeIndex}
+              canUnlock={canUnlock}
+              onUnlock={() => setUnlockedThisSession((n) => n + 1)}
+            />
           </div>
         ))}
       </Slider>
