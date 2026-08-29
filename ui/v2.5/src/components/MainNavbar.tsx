@@ -27,6 +27,7 @@ import {
   faChartColumn,
   faFilm,
   faHeart,
+  faHouse,
   faImage,
   faImages,
   faMapMarkerAlt,
@@ -50,6 +51,10 @@ interface IMenuItem {
   userCreatable?: boolean;
 }
 const messages = defineMessages({
+  landing: {
+    id: "landing",
+    defaultMessage: "Landing",
+  },
   scenes: {
     id: "scenes",
     defaultMessage: "Scenes",
@@ -97,6 +102,13 @@ const messages = defineMessages({
 });
 
 const allMenuItems: IMenuItem[] = [
+  {
+    name: "landing",
+    message: messages.landing,
+    href: "/landing",
+    icon: faHouse,
+    hotkey: "g d",
+  },
   {
     name: "scenes",
     message: messages.scenes,

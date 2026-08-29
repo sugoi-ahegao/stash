@@ -7,6 +7,7 @@ export enum View {
   Tags = "tags",
   SceneMarkers = "scene_markers",
   Studios = "studios",
+  Landing = "landing",
 
   TagMarkers = "tag_markers",
   TagGalleries = "tag_galleries",
