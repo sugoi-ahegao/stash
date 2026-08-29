@@ -333,6 +333,44 @@ function dateTimeToString(date: Date) {
     .padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
+// matches "today", "now", "yesterday", "tomorrow", optionally offset by a
+// signed amount of days/weeks/months/years, e.g. "today - 30 days", "now+2w"
+const RELATIVE_DATE_REGEX =
+  /^(today|now|yesterday|tomorrow)\s*(?:([+-])\s*(\d+)\s*(day|days|d|week|weeks|w|month|months|mo|year|years|y))?$/i;
+
+// resolveRelativeDate parses expressions like "today", "today - 30 days" or
+// "now+2w" into a concrete Date, or returns null if the string isn't one of
+// these relative expressions.
+function resolveRelativeDate(input: string): Date | null {
+  const match = input.trim().match(RELATIVE_DATE_REGEX);
+  if (!match) return null;
+
+  const [, base, sign, amountStr, unit] = match;
+  const date = new Date();
+
+  if (base.toLowerCase() === "yesterday") {
+    date.setDate(date.getDate() - 1);
+  } else if (base.toLowerCase() === "tomorrow") {
+    date.setDate(date.getDate() + 1);
+  }
+
+  if (sign && amountStr && unit) {
+    const amount = Number(amountStr) * (sign === "-" ? -1 : 1);
+    const u = unit.toLowerCase();
+    if (u.startsWith("w")) {
+      date.setDate(date.getDate() + amount * 7);
+    } else if (u.startsWith("mo")) {
+      date.setMonth(date.getMonth() + amount);
+    } else if (u.startsWith("y")) {
+      date.setFullYear(date.getFullYear() + amount);
+    } else {
+      date.setDate(date.getDate() + amount);
+    }
+  }
+
+  return date;
+}
+
 const getAge = (dateString?: string | null, fromDateString?: string | null) => {
   if (!dateString) return 0;
 
@@ -547,6 +585,7 @@ const TextUtils = {
   stringToFuzzyDateTime,
   dateToString,
   dateTimeToString,
+  resolveRelativeDate,
   age: getAge,
   bitRate,
   resolution,

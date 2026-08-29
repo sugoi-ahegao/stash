@@ -1190,6 +1190,12 @@ export class TimestampCriterion extends ModifierCriterion<ITimestampValue> {
 
   private transformValueToInput(value: string): string {
     value = value.trim();
+
+    const relative = TextUtils.resolveRelativeDate(value);
+    if (relative) {
+      return TextUtils.dateTimeToString(relative).replace(" ", "T");
+    }
+
     if (/^\d{4}-\d{2}-\d{2}(( |T)\d{2}:\d{2})?$/.test(value)) {
       return value.replace(" ", "T");
     }

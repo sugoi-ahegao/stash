@@ -19,6 +19,9 @@ export const TimestampFilter: React.FC<ITimestampFilterProps> = ({
 
   const { value } = criterion;
 
+  const relativeDateHint =
+    "e.g. today, today - 30 days/weeks/months/years";
+
   function onChanged(newValue: string, property: "value" | "value2") {
     const valueCopy = { ...value };
 
@@ -36,7 +39,7 @@ export const TimestampFilter: React.FC<ITimestampFilterProps> = ({
         <DateInput
           value={value?.value ?? ""}
           onValueChange={(v) => onChanged(v, "value")}
-          placeholder={intl.formatMessage({ id: "criterion.value" })}
+          placeholder={`${intl.formatMessage({ id: "criterion.value" })} (${relativeDateHint})`}
           isTime
         />
         {/* <Form.Control
@@ -66,7 +69,7 @@ export const TimestampFilter: React.FC<ITimestampFilterProps> = ({
         <DateInput
           value={value?.value ?? ""}
           onValueChange={(v) => onChanged(v, "value")}
-          placeholder={intl.formatMessage({ id: "criterion.greater_than" })}
+          placeholder={`${intl.formatMessage({ id: "criterion.greater_than" })} (${relativeDateHint})`}
           isTime
         />
         {/* <Form.Control
@@ -107,7 +110,7 @@ export const TimestampFilter: React.FC<ITimestampFilterProps> = ({
                 : "value2"
             )
           }
-          placeholder={intl.formatMessage({ id: "criterion.less_than" })}
+          placeholder={`${intl.formatMessage({ id: "criterion.less_than" })} (${relativeDateHint})`}
           isTime
         />
         {/* <Form.Control
