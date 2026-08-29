@@ -14,6 +14,8 @@ import { IntlShape, useIntl } from "react-intl";
 import { Icon } from "../Shared/Icon";
 import {
   faChevronDown,
+  faEye,
+  faEyeSlash,
   faList,
   faSquare,
   faTags,
@@ -24,10 +26,35 @@ import { ZoomSelect } from "./ZoomSlider";
 interface IListViewOptionsProps {
   zoomIndex?: number;
   onSetZoom?: (zoomIndex: number) => void;
+  showThumbnails?: boolean;
+  onSetShowThumbnails?: (v: boolean) => void;
   displayMode: DisplayMode;
   onSetDisplayMode: (m: DisplayMode) => void;
   displayModeOptions: DisplayMode[];
 }
+
+const ThumbnailToggleButton: React.FC<{
+  showThumbnails: boolean;
+  onSetShowThumbnails: (v: boolean) => void;
+}> = ({ showThumbnails, onSetShowThumbnails }) => {
+  const intl = useIntl();
+
+  return (
+    <Button
+      className="thumbnail-toggle"
+      variant="secondary"
+      active={!showThumbnails}
+      title={intl.formatMessage({
+        id: showThumbnails
+          ? "actions.hide_thumbnails"
+          : "actions.show_thumbnails",
+      })}
+      onClick={() => onSetShowThumbnails(!showThumbnails)}
+    >
+      <Icon icon={showThumbnails ? faEye : faEyeSlash} />
+    </Button>
+  );
+};
 
 function getIcon(option: DisplayMode) {
   switch (option) {
@@ -68,6 +95,8 @@ function getLabel(intl: IntlShape, option: DisplayMode) {
 export const ListViewOptions: React.FC<IListViewOptionsProps> = ({
   zoomIndex,
   onSetZoom,
+  showThumbnails,
+  onSetShowThumbnails,
   displayMode,
   onSetDisplayMode,
   displayModeOptions,
@@ -150,6 +179,14 @@ export const ListViewOptions: React.FC<IListViewOptionsProps> = ({
                     />
                   </div>
                 ) : null}
+                {onSetShowThumbnails &&
+                showThumbnails !== undefined &&
+                displayMode === DisplayMode.Grid ? (
+                  <ThumbnailToggleButton
+                    showThumbnails={showThumbnails}
+                    onSetShowThumbnails={onSetShowThumbnails}
+                  />
+                ) : null}
                 {displayModeOptions.map((option) => (
                   <Dropdown.Item
                     key={option}
@@ -174,6 +211,8 @@ export const ListViewOptions: React.FC<IListViewOptionsProps> = ({
 export const ListViewButtonGroup: React.FC<IListViewOptionsProps> = ({
   zoomIndex,
   onSetZoom,
+  showThumbnails,
+  onSetShowThumbnails,
   displayMode,
   onSetDisplayMode,
   displayModeOptions,
@@ -212,6 +251,14 @@ export const ListViewButtonGroup: React.FC<IListViewOptionsProps> = ({
           <ZoomSelect zoomIndex={zoomIndex} onChangeZoom={onSetZoom} />
         ) : null}
       </div>
+      {onSetShowThumbnails &&
+      showThumbnails !== undefined &&
+      displayMode === DisplayMode.Grid ? (
+        <ThumbnailToggleButton
+          showThumbnails={showThumbnails}
+          onSetShowThumbnails={onSetShowThumbnails}
+        />
+      ) : null}
     </>
   );
 };

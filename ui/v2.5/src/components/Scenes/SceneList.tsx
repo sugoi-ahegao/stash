@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import cloneDeep from "lodash-es/cloneDeep";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useHistory, useLocation } from "react-router-dom";
@@ -413,6 +413,8 @@ export const FilteredSceneList = PatchComponent(
 
     const { modal, showModal, closeModal } = modalState;
 
+    const [showThumbnails, setShowThumbnails] = useState(false);
+
     // Utility hooks
     const { setPage, removeCriterion, clearAllCriteria } = useFilterOperations({
       filter,
@@ -644,6 +646,7 @@ export const FilteredSceneList = PatchComponent(
         <div
           className={cx("item-list-container scene-list", {
             "hide-sidebar": !showSidebar,
+            "hide-thumbnails": !showThumbnails,
           })}
         >
           {modal}
@@ -676,6 +679,8 @@ export const FilteredSceneList = PatchComponent(
                   operationComponent={operations}
                   view={view}
                   zoomable
+                  showThumbnails={showThumbnails}
+                  onSetShowThumbnails={setShowThumbnails}
                 />
 
                 <FilterTags

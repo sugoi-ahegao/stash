@@ -69,6 +69,7 @@
     "hash_migration": "hash migration",
     "hide": "Hide",
     "hide_configuration": "Hide Configuration",
+    "hide_thumbnails": "Hide thumbnails",
     "identify": "Identify",
     "ignore": "Ignore",
     "import": "Import…",
@@ -136,6 +137,7 @@
     "set_image": "Set image…",
     "show": "Show",
     "show_configuration": "Show Configuration",
+    "show_thumbnails": "Show thumbnails",
     "show_results": "Show results",
     "show_count_results": "Show {count} results",
     "sidebar": {

@@ -84,6 +84,8 @@ export interface IFilteredListToolbar {
   operations?: IListFilterOperation[];
   operationComponent?: React.ReactNode;
   zoomable?: boolean;
+  showThumbnails?: boolean;
+  onSetShowThumbnails?: (v: boolean) => void;
   filterable?: boolean;
   sortable?: boolean;
 }
@@ -99,6 +101,8 @@ export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
   operations,
   operationComponent,
   zoomable = false,
+  showThumbnails,
+  onSetShowThumbnails,
   filterable = true,
   sortable = true,
 }) => {
@@ -249,6 +253,8 @@ export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
         onSetDisplayMode={setDisplayMode}
         zoomIndex={zoomable ? filter.zoomIndex : undefined}
         onSetZoom={zoomable ? setZoom : undefined}
+        showThumbnails={showThumbnails}
+        onSetShowThumbnails={onSetShowThumbnails}
       />
     </ButtonToolbar>
   );

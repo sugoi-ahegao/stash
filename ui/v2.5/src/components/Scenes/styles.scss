@@ -207,6 +207,13 @@ textarea.scene-description {
   text-transform: uppercase;
 }
 
+.hide-thumbnails {
+  .scene-card-preview-image,
+  .scene-card-preview-video {
+    display: none;
+  }
+}
+
 .scene-card {
   &-preview {
     aspect-ratio: 16/9;
