@@ -214,6 +214,21 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     });
   }
 
+  // opening the scene page counts as a play, with no play duration.
+  // the player itself doesn't increment the play count - see ScenePlayer.
+  const playedSceneID = useRef<string>();
+  useEffect(() => {
+    if (configuration?.ui?.trackActivity === false) return;
+    if (playedSceneID.current === scene.id) return;
+
+    playedSceneID.current = scene.id;
+    incrementPlay({
+      variables: {
+        id: scene.id,
+      },
+    });
+  }, [scene.id, incrementPlay, configuration?.ui?.trackActivity]);
+
   const [organizedLoading, setOrganizedLoading] = useState(false);
 
   const [activeTabKey, setActiveTabKey] = useState("scene-details-panel");
