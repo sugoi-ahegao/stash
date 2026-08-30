@@ -407,6 +407,9 @@ make build
 
 ## Additional Resources
 
+- **Codebase Guide**: See [`docs/codebase/`](codebase/README.md) — a deeper contributor's
+  guide covering the query/filter engine, transaction and hook semantics, lazy relationship
+  loading, the frontend list framework, and an index of common gotchas.
 - **Development Guide**: See `docs/DEVELOPMENT.md`
 - **Contributing**: See `docs/CONTRIBUTING.md`
 - **GraphQL Schema**: `graphql/schema/schema.graphql`

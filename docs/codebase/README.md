@@ -1,0 +1,66 @@
+# Stash Codebase Guide
+
+A working contributor's guide to how Stash actually behaves — written to complement
+[`docs/ARCHITECTURE.md`](../ARCHITECTURE.md), which gives the map. This set gives the
+*terrain*: the conventions, invariants and sharp edges you hit when you change things.
+
+Read [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) first for build/run instructions.
+
+## The documents
+
+| # | Document | Read it when |
+|---|---|---|
+| 01 | [Orientation](01-orientation.md) | You want the mental model: process topology, layer boundaries, where code lives and why |
+| 02 | [Backend request lifecycle](02-backend-request-lifecycle.md) | You're touching resolvers, mutations, transactions, plugin hooks, or model loading |
+| 03 | [The query & filter engine](03-query-filter-engine.md) | You're adding a filter, a sort, or debugging why a query returns wrong/duplicate rows |
+| 04 | [Database & migrations](04-database-migrations.md) | You're changing the schema or adding a column/table |
+| 05 | [Frontend architecture](05-frontend-architecture.md) | You're working in `ui/v2.5` — lists, filters, routing, config, plugin patching |
+| 06 | [Recipes & gotchas](06-recipes-and-gotchas.md) | You want the concrete "add a field end-to-end" walkthrough and the list of traps |
+| 07 | [This fork](07-this-fork.md) | You want to know what diverges from upstream `develop` on this branch |
+| 08 | [Frontend component map](08-frontend-components.md) | You want to know what components exist, how they nest, and where to add a new one |
+
+Docs 05 and 08 are a pair: **05 is the frontend's frameworks** (list contexts, filter model,
+patching, config), **08 is its components** (page archetypes, cards, players, dialogs, and
+the Apollo cache-invalidation contract that ties them together).
+
+## The 30-second version
+
+Stash is a **single Go binary** that embeds a **React SPA** and talks to a **single
+SQLite file**. Everything the UI does goes through **one GraphQL endpoint** (`/graphql`),
+except media bytes, which stream over **plain REST routes** (`/scene/{id}/stream`, etc.).
+
+```
+                       ┌──────────────────────────── stash binary ─────────────────────────────┐
+                       │                                                                        │
+  browser ── HTTP ────►│  chi router (internal/api/server.go)                                   │
+                       │    ├─ /graphql ──────► gqlgen ──► resolvers ──► services ──► stores ───┼──► stash-go.sqlite
+                       │    ├─ /scene/*  ──────► REST media routes ──► ffmpeg (transcode/stream)│
+                       │    ├─ /plugin/* ──────► plugin-served assets                           │
+                       │    └─ /*        ──────► embedded React SPA (internal/static)           │
+                       │                                                                        │
+                       │  background: job manager (scan / generate / clean / identify / autotag) │
+                       └────────────────────────────────────────────────────────────────────────┘
+```
+
+Three ideas explain most of the codebase:
+
+1. **Everything is generated from a schema.** The GraphQL schema in `graphql/schema/`
+   is the single source of truth. It generates Go types (`internal/api/generated_*.go`)
+   *and* TypeScript types (`ui/v2.5/src/core/generated-graphql.ts`). If you change a
+   type by hand, you're doing it wrong — change the schema and regenerate.
+
+2. **Lists are the app.** Scenes, images, galleries, performers, studios, tags and groups
+   are all "a filtered, sorted, paginated list of things". There is one filter engine on
+   the backend (doc 03) and one list framework on the frontend (doc 05). Learn each once.
+
+3. **Relationships are lazy and explicit.** A `models.Scene` doesn't eagerly carry its
+   tags. It carries a `RelatedIDs` that *panics* if you read it before loading it. This
+   is deliberate — see doc 02.
+
+## Conventions used in these docs
+
+- `path/to/file.go:123` references are clickable in most editors and were accurate at the
+  time of writing; if a line has drifted, the symbol name in the surrounding prose will
+  still find it.
+- ASCII diagrams show **data flow** (`──►`) and **containment** (boxes).
+- ⚠️ marks a genuine trap — something that compiles and looks right but misbehaves.
