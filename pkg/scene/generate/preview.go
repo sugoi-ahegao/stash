@@ -16,13 +16,14 @@ import (
 )
 
 const (
-	// upper bound on preview width, not a target - a narrower source keeps
-	// its own width rather than being upscaled. The carousel on the landing
-	// page plays a preview full-bleed, which 640 was too soft for.
-	scenePreviewMaxWidth     = 1920
 	scenePreviewAudioBitrate = "128k"
 
-	scenePreviewImageFPS = 12
+	// upper bound on the width of the animated webp preview, not a target -
+	// a narrower source keeps its own width. This is the grid card's hover
+	// thumbnail, so it stays at upstream's size; the preview *video* is
+	// generated at the scene's own resolution and has no equivalent limit.
+	scenePreviewImageMaxWidth = 640
+	scenePreviewImageFPS      = 12
 
 	minSegmentDuration = 0.75
 )
@@ -176,16 +177,19 @@ type previewChunkOptions struct {
 }
 
 func (g Generator) previewVideoChunk(lockCtx *fsutil.LockContext, fn string, options previewChunkOptions, fallback bool, useVsync2 bool) error {
-	var videoFilter ffmpeg.VideoFilter
-	videoFilter = videoFilter.ScaleMaxWidth(scenePreviewMaxWidth)
-
+	// no scale filter: the preview keeps the scene's own resolution, so a 4K
+	// scene previews at 4K and a 720p one at 720p.
 	var videoArgs ffmpeg.Args
-	videoArgs = videoArgs.VideoFilter(videoFilter)
 
 	videoArgs = append(videoArgs,
 		"-pix_fmt", "yuv420p",
 		"-profile:v", "high",
-		"-level", "4.2",
+		// no -level: upstream pinned 4.2, which can't describe anything above
+		// 1080p. Left in place, a 4K preview is stamped as level 4.2 and
+		// x264 warns three times about exceeding it - a non-conformant file
+		// that hardware decoders size their buffers from. Omitting it lets
+		// x264 derive the right level (5.1 for 4K, 4.0 for 1080p, 3.0 for
+		// 640x360).
 		"-preset", options.Preset,
 		"-crf", "21",
 		"-threads", "4",
@@ -289,7 +293,7 @@ func (g Generator) PreviewWebp(ctx context.Context, input string, hash string) e
 func (g Generator) previewVideoToImage(input string) generateFn {
 	return func(lockCtx *fsutil.LockContext, tmpFn string) error {
 		var videoFilter ffmpeg.VideoFilter
-		videoFilter = videoFilter.ScaleMaxWidth(scenePreviewMaxWidth)
+		videoFilter = videoFilter.ScaleMaxWidth(scenePreviewImageMaxWidth)
 		videoFilter = videoFilter.Fps(scenePreviewImageFPS)
 
 		var videoArgs ffmpeg.Args

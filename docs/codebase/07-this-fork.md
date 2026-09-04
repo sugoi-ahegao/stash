@@ -12,8 +12,8 @@ $ git diff --stat develop...HEAD
 GraphQL schema change and no migration. Two hand-edited Go files carry the featured-group
 lifecycle (`internal/api/scene_featured.go`, `internal/api/resolver_mutation_scene.go`);
 a third backend file (`pkg/stashbox/graphql/generated_models.go`) is a regeneration
-artefact, and two more (`pkg/scene/generate/preview.go`, `pkg/ffmpeg/filter.go`) raise
-the preview render width.
+artefact, and two more (`pkg/scene/generate/preview.go`, `pkg/ffmpeg/filter.go`) change
+how previews are sized.
 
 Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`, with
 `resolver_mutation_scene.go` as the one backend file to watch.
@@ -42,8 +42,9 @@ Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`,
        Scenes/SceneList.tsx, Scenes/styles.scss
   MOD  utils/text.ts, criteria/criterion.ts,     relative date expressions in filters
        List/Filters/TimestampFilter.tsx
-  MOD  pkg/scene/generate/preview.go,            preview render width capped at 1920
-       pkg/ffmpeg/filter.go                       (was a hard 640)
+  MOD  pkg/scene/generate/preview.go,            previews at native resolution,
+       pkg/ffmpeg/filter.go                       webp capped at 640 (was a hard 640
+                                                  for both)
   MOD  MainNavbar.tsx, index.scss,               chrome: flat navbar, shorter slide
        Landing/styles.scss
   MOD  locales/en-GB.json, index.scss
@@ -403,49 +404,62 @@ The manual "add play" control in `SceneHistoryPanel` is untouched.
 These aren't features so much as one-line decisions, but each one is easy to revert by
 accident during a rebase, so they're written down.
 
-### Preview render width — a hard 640, now a 1920 cap
+### Preview resolution — 640, now the scene's own
 
-`scenePreviewMaxWidth` (`pkg/scene/generate/preview.go`) sizes both the preview **video**
-chunks and the animated preview **webp**. Upstream's `640` was chosen when previews were
-only ever shown as small grid thumbnails; the carousel plays one full-bleed at `96vh`,
-where 640 is visibly soft.
+Upstream scaled every preview chunk to `scale=640:-2` and pinned `-level 4.2`. That was
+sized for grid thumbnails; the carousel plays a preview full-bleed at `96vh`, where 640
+is visibly soft.
 
-It's a **cap, not a target**. Upstream's `ScaleWidth` emits `scale=640:-2`, which scales
-in both directions — at 1920 that would have upscaled a 720p scene to 1080p, spending
-bitrate on invented pixels. `ScaleMaxWidth` (`pkg/ffmpeg/filter.go`) emits
+`previewVideoChunk` now applies **no scale filter at all**, so a preview is generated at
+the scene's own resolution — 4K in, 4K out; 720p in, 720p out. An intermediate cap was
+tried first and rejected: any fixed number either upscales small sources or throws away
+detail on large ones, and the display surface is a full-bleed carousel on whatever
+monitor the user has.
+
+⚠️ **`-level 4.2` had to go with it.** H.264 level 4.2 tops out around 1080p. Left in
+place on a 4K encode, x264 warns three times and stamps the level anyway:
 
 ```
-scale=min(1920\,iw):-2
+frame MB size (240x135) > level limit (8704)
+DPB size (4 frames, 129600 mbs) > level limit (1 frames, 34816 mbs)
+MB rate (810000) > level limit (522240)
+$ ffprobe … → High,3840,2160,42
 ```
 
-so the width is only ever reduced. The comma is escaped because `VideoFilter.Append`
-joins filters with commas — same convention as the existing `Select` helper. `min()` is
-evaluated by ffmpeg rather than in Go specifically so the input dimensions don't have to
-be plumbed down through `PreviewVideo`, which is only handed a duration.
+A 4K file declaring level 4.2 is non-conformant, and hardware decoders size their
+buffers from that declaration. Omitting the flag lets x264 derive it — measured: 5.1 for
+4K, 4.0 for 1080p, 3.0 for 640×360.
 
-Measured against `testsrc` at four sizes:
+**The animated webp keeps a cap.** `previewVideoToImage` scales to
+`scenePreviewImageMaxWidth` = 640 via `ScaleMaxWidth`, which emits
 
-| source | preview |
-|---|---|
-| 640×480 | 640×480 |
-| 1280×720 | 1280×720 |
-| 1920×1080 | 1920×1080 |
-| 2560×1440 | 1920×1080 |
+```
+scale=min(640\,iw):-2
+```
 
-The cost is still real for genuinely large sources:
+so it never upscales either. That file is the grid card's hover thumbnail — a 4K lossless
+animated webp would be enormous for something rendered a few hundred pixels wide. It is
+also only produced when image previews are explicitly requested (a scan option, or
+`imagePreviews` in the Generate dialog); the featured-group job omits it.
 
-- Preview generation is slower and the encode heavier — up to 9× the pixels of 640.
-- Preview files on disk grow accordingly, for **every** scene generated from now on, not
-  just featured ones. It's one constant, not a per-scene setting.
-- Existing previews are **not** regenerated. The library is mixed until scenes are
-  re-generated with `overwrite` on, and the featured-group generate job leaves
-  `overwrite` unset, so featuring an old scene will *not* upgrade its preview.
+The comma in that filter is escaped because `VideoFilter.Append` joins filters with
+commas — same convention as the existing `Select` helper. `min()` is evaluated by ffmpeg
+rather than in Go specifically so the input dimensions don't have to be plumbed down
+through `PreviewVideo`, which is only handed a duration.
 
-⚠️ The **encoding preset** matters more than the width here. Chunks are encoded at
-`-crf 21` with the configured preset, and `veryslow` at 1080p is roughly an order of
-magnitude slower than `medium` for a few percent of file size — on a throwaway derived
-file. If generation time is the problem, drop the preset in
-**Settings → System → Preview Generation** before turning this constant back down.
+Costs to know:
+
+- Generation is much heavier on large scenes — 4K is 36× the pixels of 640, and previews
+  are encoded at `-crf 21`, which is constant *quality*, so the bitrate rises to match.
+- Preview files grow accordingly, for **every** scene generated from now on.
+- Existing previews are **not** regenerated. The library stays mixed until scenes are
+  re-generated with `overwrite` on, and the featured-group job leaves `overwrite` unset,
+  so featuring an old scene will *not* upgrade its preview.
+
+⚠️ The **encoding preset** now matters more than anything else here. `veryslow` at 4K is
+roughly an order of magnitude slower than `medium` for a few percent of file size, on a
+throwaway derived file. If generation time becomes the problem, drop the preset in
+**Settings → System → Preview Generation** first.
 
 ⚠️ Marker previews are unaffected: `markerPreviewWidth` (`marker_preview.go`) is its own
 constant, still `640`. So are the two marker-duration settings in that panel.
@@ -488,10 +502,12 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
   addition, and upstream deliberately gates plays on `minimumPlayPercent`. Expect it to
   be rejected as a default. It's viable upstream only as an opt-in config setting that
   leaves the existing behaviour as the default.
-- **The preview width bump** is not upstreamable as a constant — it changes generation
-  cost and disk usage for every install. Upstream would want it as a preview setting
-  alongside `previewPreset` and the segment options, defaulting to the current `640`.
-  `ScaleMaxWidth` itself is a small general-purpose helper and would go on its own.
+- **Native-resolution previews** are not upstreamable as-is — they change generation cost
+  and disk usage for every install. Upstream would want a preview-width setting alongside
+  `previewPreset` and the segment options, defaulting to the current `640`.
+  `ScaleMaxWidth` is a small general-purpose helper and would go on its own, and the
+  `-level 4.2` removal is a straight **bug fix** worth sending upstream regardless: it
+  produces non-conformant files for any source above 1080p, at any preview width.
 
 ## Rebasing onto upstream
 
@@ -506,11 +522,11 @@ The files most likely to conflict, in order:
   ui/v2.5/src/components/ScenePlayer/ScenePlayer.tsx large, actively developed upstream
   ui/v2.5/src/models/list-filter/criteria/criterion.ts
   ui/v2.5/src/App.tsx, MainNavbar.tsx, locales/en-GB.json   small, mechanical
-  pkg/scene/generate/preview.go                      one constant plus two ScaleMaxWidth
-                                                     calls; an upstream change here will
+  pkg/scene/generate/preview.go                      a removed scale filter, a removed
+                                                     -level flag and one ScaleMaxWidth
+                                                     call; an upstream change here will
                                                      look like a clean take of theirs —
-                                                     re-check the width and that it is
-                                                     still the non-upscaling helper
+                                                     re-check all three
   pkg/ffmpeg/filter.go                               new helper, appended near ScaleWidth
 ```
 
