@@ -1,5 +1,9 @@
 // hardcoded to the "${featured}" group in this library - there's no
 // config setting yet to choose the featured group.
+//
+// The server stamps the custom fields below and kicks off generation when a
+// scene joins or leaves this group - keep these in sync with the constants in
+// internal/api/scene_featured.go.
 export const FEATURED_GROUP_ID = "25";
 
 // custom field stamped on a scene when it's added to the featured

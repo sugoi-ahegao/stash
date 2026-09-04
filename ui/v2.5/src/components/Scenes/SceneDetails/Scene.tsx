@@ -11,7 +11,6 @@ import { useHistory, RouteComponentProps } from "react-router-dom";
 import { Helmet } from "react-helmet";
 import * as GQL from "src/core/generated-graphql";
 import {
-  mutateMetadataGenerate,
   mutateMetadataScan,
   useFindScene,
   useSceneIncrementO,
@@ -32,11 +31,6 @@ import SceneQueue, { QueuedScene } from "src/models/sceneQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
-import {
-  FEATURED_ADDED_AT_FIELD,
-  FEATURED_GROUP_ID,
-  FEATURE_UNLOCKED_AT_FIELD,
-} from "src/components/Landing/featuredGroup";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
   getAbLoopPlugin,
@@ -304,31 +298,8 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   });
 
   async function onSave(input: GQL.SceneCreateInput) {
-    const hadFeatured = scene.groups.some(
-      (g) => g.group.id === FEATURED_GROUP_ID
-    );
-    const hasFeatured = (input.groups ?? []).some(
-      (g) => g.group_id === FEATURED_GROUP_ID
-    );
-
-    if (hasFeatured !== hadFeatured) {
-      const customFields: { [key: string]: unknown } = {
-        ...(input.custom_fields?.full ?? scene.custom_fields),
-      };
-
-      if (hasFeatured) {
-        customFields[FEATURED_ADDED_AT_FIELD] = new Date().toISOString();
-      } else {
-        delete customFields[FEATURED_ADDED_AT_FIELD];
-        delete customFields[FEATURE_UNLOCKED_AT_FIELD];
-      }
-
-      input = {
-        ...input,
-        custom_fields: { full: customFields },
-      };
-    }
-
+    // adding the scene to the featured group stamps featured_added_at and
+    // kicks off generation - the server does this for every update path.
     await updateScene({
       variables: {
         input: {
@@ -337,24 +308,6 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         },
       },
     });
-
-    if (hasFeatured && !hadFeatured) {
-      // same defaults as the manual Generate dialog - overwrite is left
-      // unset so existing thumbnails/previews/etc. aren't regenerated.
-      mutateMetadataGenerate({
-        sceneIDs: [scene.id],
-        sprites: true,
-        phashes: true,
-        previews: true,
-        covers: true,
-        markers: true,
-        previewOptions: {
-          previewSegments: 0,
-          previewSegmentDuration: 0,
-          previewPreset: GQL.PreviewPreset.Slow,
-        },
-      }).catch(() => {});
-    }
 
     Toast.success(
       intl.formatMessage(
