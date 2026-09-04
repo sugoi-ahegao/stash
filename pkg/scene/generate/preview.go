@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	scenePreviewWidth        = 640
+	scenePreviewWidth        = 1920
 	scenePreviewAudioBitrate = "128k"
 
 	scenePreviewImageFPS = 12
