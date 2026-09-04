@@ -22,6 +22,16 @@ func (f VideoFilter) ScaleWidth(w int) VideoFilter {
 	return f.ScaleDimensions(w, -2)
 }
 
+// ScaleMaxWidth returns a VideoFilter scaling the width down to at most w,
+// maintaining aspect ratio and a height as a multiple of 2. Unlike ScaleWidth
+// it never upscales - a source narrower than w is left at its own width.
+func (f VideoFilter) ScaleMaxWidth(w int) VideoFilter {
+	// min() is evaluated by ffmpeg rather than in Go so that callers don't
+	// have to plumb the input dimensions through. The comma is escaped
+	// because Append uses commas to separate filters.
+	return f.Append(fmt.Sprintf("scale=min(%d\\,iw):-2", w))
+}
+
 func (f VideoFilter) ScaleHeight(h int) VideoFilter {
 	return f.ScaleDimensions(-2, h)
 }

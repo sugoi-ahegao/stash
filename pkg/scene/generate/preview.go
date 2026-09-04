@@ -16,7 +16,10 @@ import (
 )
 
 const (
-	scenePreviewWidth        = 1920
+	// upper bound on preview width, not a target - a narrower source keeps
+	// its own width rather than being upscaled. The carousel on the landing
+	// page plays a preview full-bleed, which 640 was too soft for.
+	scenePreviewMaxWidth     = 1920
 	scenePreviewAudioBitrate = "128k"
 
 	scenePreviewImageFPS = 12
@@ -174,7 +177,7 @@ type previewChunkOptions struct {
 
 func (g Generator) previewVideoChunk(lockCtx *fsutil.LockContext, fn string, options previewChunkOptions, fallback bool, useVsync2 bool) error {
 	var videoFilter ffmpeg.VideoFilter
-	videoFilter = videoFilter.ScaleWidth(scenePreviewWidth)
+	videoFilter = videoFilter.ScaleMaxWidth(scenePreviewMaxWidth)
 
 	var videoArgs ffmpeg.Args
 	videoArgs = videoArgs.VideoFilter(videoFilter)
@@ -286,7 +289,7 @@ func (g Generator) PreviewWebp(ctx context.Context, input string, hash string) e
 func (g Generator) previewVideoToImage(input string) generateFn {
 	return func(lockCtx *fsutil.LockContext, tmpFn string) error {
 		var videoFilter ffmpeg.VideoFilter
-		videoFilter = videoFilter.ScaleWidth(scenePreviewWidth)
+		videoFilter = videoFilter.ScaleMaxWidth(scenePreviewMaxWidth)
 		videoFilter = videoFilter.Fps(scenePreviewImageFPS)
 
 		var videoArgs ffmpeg.Args

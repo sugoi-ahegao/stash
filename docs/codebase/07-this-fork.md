@@ -12,8 +12,8 @@ $ git diff --stat develop...HEAD
 GraphQL schema change and no migration. Two hand-edited Go files carry the featured-group
 lifecycle (`internal/api/scene_featured.go`, `internal/api/resolver_mutation_scene.go`);
 a third backend file (`pkg/stashbox/graphql/generated_models.go`) is a regeneration
-artefact, and a fourth (`pkg/scene/generate/preview.go`) is a one-constant tweak that
-raises the preview render width.
+artefact, and two more (`pkg/scene/generate/preview.go`, `pkg/ffmpeg/filter.go`) raise
+the preview render width.
 
 Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`, with
 `resolver_mutation_scene.go` as the one backend file to watch.
@@ -42,7 +42,8 @@ Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`,
        Scenes/SceneList.tsx, Scenes/styles.scss
   MOD  utils/text.ts, criteria/criterion.ts,     relative date expressions in filters
        List/Filters/TimestampFilter.tsx
-  MOD  pkg/scene/generate/preview.go             preview render width 640 -> 1920
+  MOD  pkg/scene/generate/preview.go,            preview render width capped at 1920
+       pkg/ffmpeg/filter.go                       (was a hard 640)
   MOD  MainNavbar.tsx, index.scss,               chrome: flat navbar, shorter slide
        Landing/styles.scss
   MOD  locales/en-GB.json, index.scss
@@ -402,26 +403,52 @@ The manual "add play" control in `SceneHistoryPanel` is untouched.
 These aren't features so much as one-line decisions, but each one is easy to revert by
 accident during a rebase, so they're written down.
 
-### Preview render width — 640 → 1920
+### Preview render width — a hard 640, now a 1920 cap
 
-`scenePreviewWidth` (`pkg/scene/generate/preview.go`) feeds `ScaleWidth` for both the
-preview **video** chunks and the animated preview **webp**. Upstream's `640` was chosen
-when previews were only ever shown as small grid thumbnails.
+`scenePreviewMaxWidth` (`pkg/scene/generate/preview.go`) sizes both the preview **video**
+chunks and the animated preview **webp**. Upstream's `640` was chosen when previews were
+only ever shown as small grid thumbnails; the carousel plays one full-bleed at `96vh`,
+where 640 is visibly soft.
 
-The carousel plays a preview video full-bleed at `96vh`, where a 640px-wide source is
-visibly soft. `1920` makes it a full-resolution source.
+It's a **cap, not a target**. Upstream's `ScaleWidth` emits `scale=640:-2`, which scales
+in both directions — at 1920 that would have upscaled a 720p scene to 1080p, spending
+bitrate on invented pixels. `ScaleMaxWidth` (`pkg/ffmpeg/filter.go`) emits
 
-The cost is real and worth knowing before you copy this:
+```
+scale=min(1920\,iw):-2
+```
 
-- Preview generation is slower and the ffmpeg encode is heavier — this is 9× the pixels.
+so the width is only ever reduced. The comma is escaped because `VideoFilter.Append`
+joins filters with commas — same convention as the existing `Select` helper. `min()` is
+evaluated by ffmpeg rather than in Go specifically so the input dimensions don't have to
+be plumbed down through `PreviewVideo`, which is only handed a duration.
+
+Measured against `testsrc` at four sizes:
+
+| source | preview |
+|---|---|
+| 640×480 | 640×480 |
+| 1280×720 | 1280×720 |
+| 1920×1080 | 1920×1080 |
+| 2560×1440 | 1920×1080 |
+
+The cost is still real for genuinely large sources:
+
+- Preview generation is slower and the encode heavier — up to 9× the pixels of 640.
 - Preview files on disk grow accordingly, for **every** scene generated from now on, not
-  just featured ones. There's one constant, not a per-scene setting.
+  just featured ones. It's one constant, not a per-scene setting.
 - Existing previews are **not** regenerated. The library is mixed until scenes are
   re-generated with `overwrite` on, and the featured-group generate job leaves
   `overwrite` unset, so featuring an old scene will *not* upgrade its preview.
 
-If preview generation time becomes a problem, this is the first thing to turn back down;
-nothing else depends on the value.
+⚠️ The **encoding preset** matters more than the width here. Chunks are encoded at
+`-crf 21` with the configured preset, and `veryslow` at 1080p is roughly an order of
+magnitude slower than `medium` for a few percent of file size — on a throwaway derived
+file. If generation time is the problem, drop the preset in
+**Settings → System → Preview Generation** before turning this constant back down.
+
+⚠️ Marker previews are unaffected: `markerPreviewWidth` (`marker_preview.go`) is its own
+constant, still `640`. So are the two marker-duration settings in that panel.
 
 ### Navbar blends into the page
 
@@ -464,6 +491,7 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
 - **The preview width bump** is not upstreamable as a constant — it changes generation
   cost and disk usage for every install. Upstream would want it as a preview setting
   alongside `previewPreset` and the segment options, defaulting to the current `640`.
+  `ScaleMaxWidth` itself is a small general-purpose helper and would go on its own.
 
 ## Rebasing onto upstream
 
@@ -478,9 +506,12 @@ The files most likely to conflict, in order:
   ui/v2.5/src/components/ScenePlayer/ScenePlayer.tsx large, actively developed upstream
   ui/v2.5/src/models/list-filter/criteria/criterion.ts
   ui/v2.5/src/App.tsx, MainNavbar.tsx, locales/en-GB.json   small, mechanical
-  pkg/scene/generate/preview.go                      one constant; an upstream change
-                                                     here will look like a clean take
-                                                     of theirs — re-check it's 1920
+  pkg/scene/generate/preview.go                      one constant plus two ScaleMaxWidth
+                                                     calls; an upstream change here will
+                                                     look like a clean take of theirs —
+                                                     re-check the width and that it is
+                                                     still the non-upscaling helper
+  pkg/ffmpeg/filter.go                               new helper, appended near ScaleWidth
 ```
 
 `pkg/stashbox/graphql/generated_models.go` should be resolved by **regenerating**

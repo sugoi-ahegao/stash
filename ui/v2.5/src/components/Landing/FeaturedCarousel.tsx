@@ -38,7 +38,7 @@ const PREVIEW_DELAY_MS = 1000;
 // SLIDE_DURATION_MS + SLIDE_TRANSITION_MS. Keep it comfortably above
 // PREVIEW_DELAY_MS or unlocked slides will move on before their preview has
 // had a chance to start.
-const SLIDE_DURATION_MS = 10000;
+const SLIDE_DURATION_MS = 20000;
 
 // how long the crossfade between slides takes.
 const SLIDE_TRANSITION_MS = 600;
@@ -142,7 +142,7 @@ const FeaturedSlide: React.FC<{
             },
           },
         },
-      }).catch(() => {});
+      }).catch(() => { });
     }, HOLD_DURATION_MS);
   }
 
@@ -172,7 +172,7 @@ const FeaturedSlide: React.FC<{
 
   useEffect(() => {
     if (showPreview) {
-      videoEl.current?.play()?.catch(() => {});
+      videoEl.current?.play()?.catch(() => { });
     } else {
       videoEl.current?.pause();
       if (videoEl.current) {
