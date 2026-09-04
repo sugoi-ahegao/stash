@@ -134,6 +134,12 @@ that doesn't warrant a schema change** — the fork on this branch uses it for
 Custom fields are loaded through their own dataloader (`CustomFieldsLoader`) and are
 filterable via `custom-fields.ts` criteria on the frontend.
 
+`SetCustomFields` takes a `CustomFieldsInput` with three modes, and the choice matters:
+`full` **replaces the entire map**, `partial` merges only the listed keys, and `remove`
+deletes keys. `full` and `partial` are mutually exclusive (`full` wins); either may be
+combined with `remove` in one call, but a key may not appear in both — that's a
+validation error, not a silent precedence rule.
+
 ## Migrations
 
 ```
