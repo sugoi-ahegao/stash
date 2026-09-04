@@ -13,13 +13,33 @@ import {
 } from "./featuredGroup";
 import {
   canUnlockMore,
+  isUnlockExpired,
+  remainingUnlocks,
   shouldRemoveFromFeatured,
   startOfToday,
 } from "./featuredPolicy";
 
+// --- tunables - the policy ones live in featuredPolicy.ts ---
+
+// the most slides the carousel will show. It's a cap, not a target: slots
+// are filled by walking the group oldest-featured-first, and expired
+// unlocks and out-of-budget locked slides are skipped, so the carousel
+// often runs shorter than this.
 const FEATURED_COUNT = 10;
+
+// how long an unlocked slide sits on its still frame before the preview
+// video fades in. Long enough that flicking past a slide doesn't start a
+// video; the timer resets whenever the slide stops being active.
 const PREVIEW_DELAY_MS = 1000;
+
+// how long you have to hold a locked slide to reveal it. Releasing early
+// cancels with nothing spent - only a completed hold burns one of
+// MAX_UNLOCKS_PER_DAY. Keep it in step with the CSS transition on
+// .slide-reveal-clip / .slide-glass in styles.scss, which animates the iris
+// over the same period.
 const HOLD_DURATION_MS = 2000;
+
+// -------------------------------------------------------------
 
 const SlideGlass: React.FC<{
   holding: boolean;
@@ -214,7 +234,12 @@ const FeaturedSlide: React.FC<{
 
 export const FeaturedCarousel: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [unlockedThisSession, setUnlockedThisSession] = useState(0);
+  // ids, not a count: the unlock budget drives which slides are shown, so we
+  // need to know *which* scenes were unlocked in this session and not just
+  // how many. See unlockedToday below.
+  const [unlockedThisSession, setUnlockedThisSession] = useState<Set<string>>(
+    () => new Set()
+  );
   const [updateScene] = useSceneUpdate();
   const removedRef = useRef<Set<string>>(new Set());
 
@@ -250,18 +275,73 @@ export const FeaturedCarousel: React.FC = () => {
       },
     },
   });
-  const unlockedToday =
-    (unlockedTodayData?.findScenes.count ?? 0) + unlockedThisSession;
-  const canUnlock = canUnlockMore(unlockedToday);
+  // both queries above select `findScenes`, so a scene update evicts and
+  // refetches both together. Adding every in-session unlock to the count
+  // would therefore double-count as soon as the refetch lands, and burn the
+  // day's budget at twice the rate. Only count an in-session unlock while
+  // the group query still shows the scene without its stamp - once the stamp
+  // is there, the count query has it too. A scene that has left the group
+  // entirely isn't ours to count; the library-wide count covers it.
+  const pendingUnlocks = useMemo(() => {
+    const byID = new Map(
+      (data?.findScenes.scenes ?? []).map((scene) => [scene.id, scene])
+    );
 
-  const scenes = useMemo(
-    () =>
-      (data?.findScenes.scenes ?? [])
-        .slice()
-        .sort(byFeaturedAddedAt)
-        .slice(0, FEATURED_COUNT),
-    [data]
-  );
+    return [...unlockedThisSession].filter((id) => {
+      const scene = byID.get(id);
+      return scene && !scene.custom_fields[FEATURE_UNLOCKED_AT_FIELD];
+    }).length;
+  }, [data, unlockedThisSession]);
+
+  const unlockedToday =
+    (unlockedTodayData?.findScenes.count ?? 0) + pendingUnlocks;
+  const canUnlock = canUnlockMore(unlockedToday);
+  const lockedSlots = remainingUnlocks(unlockedToday);
+
+  // walk the group oldest-featured-first and fill up to FEATURED_COUNT
+  // slots. Two things get skipped:
+  //   - slides whose unlock has expired (seen, and past their window)
+  //   - locked slides beyond `lockedSlots`, because you can't open them
+  //     today and a slide you can't open is just a tease
+  // A scene unlocked in this session counts as unlocked even before its
+  // stamp lands, so spending an unlock doesn't yank a *different* slide out
+  // from under you mid-session.
+  //
+  // `considered` is every scene walked, skipped ones included, because the
+  // removal sweep below still has to see them - a hidden slide that never
+  // gets swept would sit in the group forever. Note that once locked slides
+  // are being skipped the walk runs to the end of the group, so the sweep
+  // covers the whole group rather than just the visible window.
+  const { scenes, consideredScenes } = useMemo(() => {
+    const sorted = (data?.findScenes.scenes ?? [])
+      .slice()
+      .sort(byFeaturedAddedAt);
+
+    const now = new Date();
+    const visible: FeaturedScene[] = [];
+    const considered: FeaturedScene[] = [];
+    let lockedShown = 0;
+
+    for (const scene of sorted) {
+      considered.push(scene);
+
+      if (isUnlockExpired(scene, now)) continue;
+
+      const unlocked =
+        !!scene.custom_fields[FEATURE_UNLOCKED_AT_FIELD] ||
+        unlockedThisSession.has(scene.id);
+
+      if (!unlocked) {
+        if (lockedShown >= lockedSlots) continue;
+        lockedShown++;
+      }
+
+      visible.push(scene);
+      if (visible.length === FEATURED_COUNT) break;
+    }
+
+    return { scenes: visible, consideredScenes: considered };
+  }, [data, lockedSlots, unlockedThisSession]);
 
   // lazily enforce the removal rules (rated, or unlocked-and-unrated past
   // the expiry window) whenever the featured list loads/changes. This
@@ -269,7 +349,7 @@ export const FeaturedCarousel: React.FC = () => {
   // background job sweeping it on a schedule.
   useEffect(() => {
     const now = new Date();
-    for (const scene of scenes) {
+    for (const scene of consideredScenes) {
       if (removedRef.current.has(scene.id)) continue;
       if (!shouldRemoveFromFeatured(scene, now)) continue;
 
@@ -293,7 +373,7 @@ export const FeaturedCarousel: React.FC = () => {
         removedRef.current.delete(scene.id);
       });
     }
-  }, [scenes, updateScene]);
+  }, [consideredScenes, updateScene]);
 
   if (loading) {
     return <LoadingIndicator />;
@@ -327,7 +407,9 @@ export const FeaturedCarousel: React.FC = () => {
               scene={scene}
               active={index === activeIndex}
               canUnlock={canUnlock}
-              onUnlock={() => setUnlockedThisSession((n) => n + 1)}
+              onUnlock={() =>
+                setUnlockedThisSession((ids) => new Set(ids).add(scene.id))
+              }
             />
           </div>
         ))}
