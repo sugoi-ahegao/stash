@@ -285,8 +285,13 @@ which is what makes it easy to raise the limit temporarily while testing.
   `width`/`display` onto them. The comment in the source explains it; don't flatten that
   extra div.
 - **Preview video discipline.** `preload="none"`, plays only when the slide is `active`
-  **and** `revealed`, after a 1s delay, and rewinds to 0 on pause. Ten autoplaying video
-  elements would otherwise be a real performance problem.
+  **and** `revealed`, after `PREVIEW_DELAY_MS`, and rewinds to 0 on pause. Ten autoplaying
+  video elements would otherwise be a real performance problem.
+- **Slide pacing.** `SLIDE_DURATION_MS` (10s) and `SLIDE_TRANSITION_MS` (600ms) feed
+  react-slick's `autoplaySpeed`/`speed`. The dwell timer pauses on hover and doesn't start
+  until the transition finishes, so a slide is up for roughly the sum of the two. Keep
+  `SLIDE_DURATION_MS` comfortably above `PREVIEW_DELAY_MS`, or the carousel advances
+  before an unlocked slide's preview has started.
 - **Custom field update modes.** Note the shapes used:
   `custom_fields: { partial: {...} }` to set one key (on unlock, and on the server when
   a scene joins the group) and `custom_fields: { remove: [...] }` to delete keys (the

@@ -32,6 +32,17 @@ const FEATURED_COUNT = 10;
 // video; the timer resets whenever the slide stops being active.
 const PREVIEW_DELAY_MS = 1000;
 
+// how long a slide stays on screen before the carousel advances. Hovering
+// the carousel pauses the timer (pauseOnHover), and it does not start until
+// the previous transition has finished, so a slide is actually up for about
+// SLIDE_DURATION_MS + SLIDE_TRANSITION_MS. Keep it comfortably above
+// PREVIEW_DELAY_MS or unlocked slides will move on before their preview has
+// had a chance to start.
+const SLIDE_DURATION_MS = 10000;
+
+// how long the crossfade between slides takes.
+const SLIDE_TRANSITION_MS = 600;
+
 // how long you have to hold a locked slide to reveal it. Releasing early
 // cancels with nothing spent - only a completed hold burns one of
 // MAX_UNLOCKS_PER_DAY. Keep it in step with the CSS transition on
@@ -390,8 +401,8 @@ export const FeaturedCarousel: React.FC = () => {
         arrows
         infinite
         autoplay
-        autoplaySpeed={10000}
-        speed={600}
+        autoplaySpeed={SLIDE_DURATION_MS}
+        speed={SLIDE_TRANSITION_MS}
         fade
         pauseOnHover
         slidesToShow={1}
