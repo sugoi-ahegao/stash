@@ -1036,6 +1036,9 @@ div.dropdown-menu {
 }
 
 .top-nav {
+  // match the page background rather than bootstrap's .bg-dark, so the
+  // bar reads as part of the page instead of a separate strip.
+  background-color: $body-bg;
   justify-content: start;
   padding: 0.25rem 1rem;
 

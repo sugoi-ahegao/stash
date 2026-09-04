@@ -362,14 +362,13 @@ export const MainNavbar: React.FC = () => {
       collapseOnSelect
       fixed="top"
       variant="dark"
-      bg="dark"
       className="top-nav"
       expand="xl"
       expanded={expanded}
       onToggle={setExpanded}
       ref={navbarRef}
     >
-      <Navbar.Collapse className="bg-dark order-sm-1">
+      <Navbar.Collapse className="order-sm-1">
         <MainNavbarMenuItems>
           {menuItems.map(({ href, icon, message }) => (
             <Nav.Link
