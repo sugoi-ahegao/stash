@@ -1061,6 +1061,17 @@ input[type="range"].blue-slider {
 $fire-settle-duration: 400ms;
 $fire-settle-offset: 500ms;
 
+// The ignition, in the order the card catches. These are offsets from the
+// moment .awake lands, and the sequence is the point: everything arriving at
+// once is a fade, and a fade is what a card looks like when it is told it is
+// on fire rather than when it catches.
+$fire-catch-delay: 0ms; // the bloom of light at the bottom edge
+$fire-kick-delay: 40ms; // the card knocked upwards by the catch
+$fire-char-delay: 60ms; // the stock blackening, from that edge upwards
+$fire-flare-delay: 120ms; // the flames taking hold, and the rim lighting
+$fire-react-delay: 120ms; // the heat glow coming up under the card
+$fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
+
 // The flames are a sprite sheet: ten drawn frames in a strip, stepped through
 // rather than tweened, which is how the art was meant to be played. The strip
 // is built from the source sheet by scripts/build_flame_sprite.py, which cuts
@@ -1094,6 +1105,123 @@ $fire-settle-offset: 500ms;
   100% {
     opacity: 0;
     transform: translate(var(--fire-ember-drift), -180px) scale(0.2);
+  }
+}
+
+// The card knocked upwards by its own ignition, and falling back.
+//
+// It fires with the catch, not after it: the shove has to be part of the
+// same event as the flare, or it reads as the card responding to something
+// that has already finished. Its peak lands around the bloom's own.
+//
+// The shape is the rest of it: out fast, a moment hanging, then an
+// accelerating fall that carries the card just past where it started before
+// it settles. Easing is set per keyframe because a single curve across the
+// whole thing gives a float, not a shove.
+@keyframes fire-kick {
+  0% {
+    animation-timing-function: cubic-bezier(0.12, 0.85, 0.3, 1);
+    transform: translateY(0);
+  }
+
+  18% {
+    animation-timing-function: ease-in-out;
+    transform: translateY(-12px);
+  }
+
+  40% {
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.55);
+    transform: translateY(-10px);
+  }
+
+  70% {
+    animation-timing-function: ease-out;
+    transform: translateY(1px);
+  }
+
+  86% {
+    animation-timing-function: ease-in-out;
+    transform: translateY(-3.5px);
+  }
+
+  100% {
+    transform: translateY(-2px);
+  }
+}
+
+// The bloom of light thrown up the card as it catches, gone almost at once.
+@keyframes fire-catch {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.35);
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scaleY(1.3);
+  }
+}
+
+// The char spreading up from the burning edge, rather than the whole card
+// darkening at once.
+@keyframes fire-char {
+  0% {
+    clip-path: inset(100% 0 0 0);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+// The flames taking hold: up fast from nothing, overshoot, settle back. The
+// overshoot is most of what makes it feel like ignition instead of a reveal.
+@keyframes fire-flare-up {
+  0% {
+    transform: scale(0.7, 0);
+  }
+
+  55% {
+    transform: scale(1.04, 1.14);
+  }
+
+  78% {
+    transform: scale(0.99, 0.96);
+  }
+
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+// The rim going from white-hot to its own colour. The last keyframe is the
+// filter the rim already carries, so the animation can end without a jump and
+// without needing to be held with `forwards`.
+@keyframes fire-rim-catch {
+  0% {
+    filter: brightness(2.6) saturate(0.35)
+      drop-shadow(0 0 12px rgba(255, 226, 180, 0.95));
+    opacity: 0;
+  }
+
+  14% {
+    opacity: 1;
+  }
+
+  100% {
+    filter: brightness(1) saturate(1) drop-shadow(0 0 4px rgba(255, 140, 40, 0.9))
+      drop-shadow(0 0 14px rgba(255, 90, 20, 0.45));
+    opacity: 1;
   }
 }
 
@@ -1170,6 +1298,7 @@ $fire-settle-offset: 500ms;
   opacity: 0;
   pointer-events: none;
   position: absolute;
+  transform-origin: 50% 100%;
   transition: opacity $fire-settle-duration ease-out;
   z-index: 9;
 }
@@ -1314,6 +1443,25 @@ $fire-settle-offset: 500ms;
     transition: color 300ms ease-out;
   }
 
+  // The bloom of light thrown up as the card catches. It sits at the flames'
+  // own layer, below the preview, so the ignition never lights the picture.
+  &::after {
+    background: radial-gradient(
+      ellipse 70% 55% at 50% 100%,
+      rgba(255, 246, 214, 0.95),
+      rgba(255, 176, 60, 0.55) 30%,
+      rgba(255, 90, 20, 0.18) 55%,
+      rgba(255, 60, 10, 0) 78%
+    );
+    content: "";
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    transform-origin: 50% 100%;
+    z-index: 9;
+  }
+
   // The burning edge. A gradient can't be a border colour, so it fills the
   // whole overlay and a mask punches out the middle, leaving only the rim -
   // and the drop-shadows then glow off that rim rather than off a rectangle.
@@ -1358,45 +1506,60 @@ $fire-settle-offset: 500ms;
   }
 
   &.awake {
+    // The card's own padding is left alone: insetting the preview on waking
+    // reframes it, which reads as the card resizing under the cursor rather
+    // than catching fire. It runs to the card's edge awake or asleep.
+    //
+    // The transform belongs to fire-kick rather than to the transition - it
+    // has to leave, hang and fall, which one eased move between two values
+    // cannot do. Its last keyframe is the resting lift, and `both` holds it
+    // there afterwards.
+    animation: fire-kick 560ms $fire-kick-delay both;
     box-shadow:
       0 0 0 1px rgba(255, 150, 60, 0.35),
       0 0 18px rgba(255, 110, 30, 0.45),
       0 10px 40px rgba(230, 80, 15, 0.3),
       0 2px 10px rgba(0, 0, 0, 0.6);
-    // Inset the preview so the burning stock frames it, the way the image
-    // sits inside a trading card rather than running to its edge.
-    padding: 5px 5px 0;
-    transform: translateY(-2px);
-    transition:
-      box-shadow $fire-settle-duration ease-out $fire-settle-offset,
-      padding $fire-settle-duration ease-out $fire-settle-offset,
-      transform $fire-settle-duration ease-out $fire-settle-offset;
+    transition: box-shadow $fire-settle-duration ease-out $fire-react-delay;
 
-    .fire-embers,
-    .fire-flames,
-    .fire-surface {
-      opacity: 1;
-      transition-delay: $fire-settle-offset;
+    &::after {
+      animation: fire-catch 420ms ease-out $fire-catch-delay both;
     }
 
+    .fire-surface {
+      animation: fire-char 460ms ease-out $fire-char-delay both;
+      opacity: 1;
+    }
+
+    .fire-flames {
+      animation: fire-flare-up 780ms cubic-bezier(0.2, 0.8, 0.3, 1)
+        $fire-flare-delay both;
+      opacity: 1;
+      transition-delay: $fire-flare-delay;
+    }
+
+    .fire-embers {
+      opacity: 1;
+      transition-delay: $fire-ember-delay;
+    }
+
+    // The catch runs first and hands the rim over at exactly the filter the
+    // rim already declares; the flicker only starts once it has finished, so
+    // the two never fight over opacity.
     &::before {
       animation:
-        fire-rim-travel 4s linear $fire-settle-offset infinite,
-        fire-rim-flicker 2.3s ease-in-out $fire-settle-offset infinite;
+        fire-rim-catch 700ms ease-out $fire-flare-delay both,
+        fire-rim-travel 4s linear $fire-flare-delay infinite,
+        fire-rim-flicker 2.3s ease-in-out 820ms infinite;
       opacity: 1;
-      transition-delay: $fire-settle-offset;
     }
 
+    // Above the flame, which is what keeps fire off the preview. Nothing else
+    // is done to it: no inset, no frame, no background. Any part of this box
+    // the preview does not cover - the letterboxing on a portrait scene, the
+    // strip under a short preview - shows the charred stock like the rest of
+    // the card rather than a black panel, and the flames stop well below it.
     .thumbnail-section {
-      // opaque, and above the flame: this is what keeps the fire off the
-      // preview. A transparent one would let it through the letterboxing on
-      // portrait scenes.
-      background-color: #0d0906;
-      border-radius: 4px;
-      box-shadow:
-        0 0 0 1px rgba(255, 140, 50, 0.3),
-        inset 0 0 20px rgba(0, 0, 0, 0.55);
-      overflow: hidden;
       position: relative;
       z-index: 10;
     }
@@ -1434,13 +1597,26 @@ $fire-settle-offset: 500ms;
 }
 
 // Golden scenes still catch light without motion: waking a card chars the
-// stock and lights the rim, but nothing travels, flickers or rises.
+// stock and lights the rim, but nothing ignites, travels, flickers or rises -
+// it is simply already alight.
 @media (prefers-reduced-motion: reduce) {
   .scene-card.golden.awake {
+    animation: none;
     transform: none;
+
+    &::after {
+      animation: none;
+      opacity: 0;
+    }
 
     &::before {
       animation: none;
+    }
+
+    .fire-flames,
+    .fire-surface {
+      animation: none;
+      opacity: 1;
     }
 
     .fire-embers {
