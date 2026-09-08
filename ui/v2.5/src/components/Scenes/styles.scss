@@ -1066,7 +1066,10 @@ $fire-settle-offset: 500ms;
 // once is a fade, and a fade is what a card looks like when it is told it is
 // on fire rather than when it catches.
 $fire-catch-delay: 0ms; // the bloom of light at the bottom edge
-$fire-kick-delay: 40ms; // the card knocked upwards by the catch
+// The flames bursting up, and the card knocked upwards - one instant, on
+// purpose. The fire has to be the thing that shoves the card, so it cannot
+// still be growing after the card has landed.
+$fire-burst-delay: 40ms;
 $fire-char-delay: 60ms; // the stock blackening, from that edge upwards
 $fire-flare-delay: 120ms; // the flames taking hold, and the rim lighting
 $fire-react-delay: 120ms; // the heat glow coming up under the card
@@ -1184,23 +1187,25 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
   }
 }
 
-// The flames taking hold: up fast from nothing, overshoot, settle back. The
-// overshoot is most of what makes it feel like ignition instead of a reveal.
-@keyframes fire-flare-up {
+// The flames rising into view, uncovered from the bottom edge upwards.
+//
+// A reveal, not a scale. Growing the flames by transform stretches and then
+// squashes the drawing to get its overshoot, and a hand-drawn flame does not
+// survive being stretched - it reads as a picture being inflated. Clipping
+// leaves every frame at its true size and simply uncovers more of it.
+//
+// The clip runs the full height of the layer so its end state is unclipped,
+// with no measurement of where the flames happen to reach. They occupy only
+// the lower part of it, so they stand fully revealed well before the end -
+// which is the point: the fire is up quickly, and the tail of the animation
+// costs nothing.
+@keyframes fire-rise {
   0% {
-    transform: scale(0.7, 0);
-  }
-
-  55% {
-    transform: scale(1.04, 1.14);
-  }
-
-  78% {
-    transform: scale(0.99, 0.96);
+    clip-path: inset(100% 0 0 0);
   }
 
   100% {
-    transform: scale(1, 1);
+    clip-path: inset(0 0 0 0);
   }
 }
 
@@ -1299,7 +1304,9 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
   pointer-events: none;
   position: absolute;
   transform-origin: 50% 100%;
-  transition: opacity $fire-settle-duration ease-out;
+  // short on purpose: the clip is what reveals the flames, and a slow fade
+  // over the top of it blurs the edge the wipe is meant to have
+  transition: opacity 120ms ease-out;
   z-index: 9;
 }
 
@@ -1514,7 +1521,7 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
     // has to leave, hang and fall, which one eased move between two values
     // cannot do. Its last keyframe is the resting lift, and `both` holds it
     // there afterwards.
-    animation: fire-kick 560ms $fire-kick-delay both;
+    animation: fire-kick 560ms $fire-burst-delay both;
     box-shadow:
       0 0 0 1px rgba(255, 150, 60, 0.35),
       0 0 18px rgba(255, 110, 30, 0.45),
@@ -1531,11 +1538,14 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
       opacity: 1;
     }
 
+    // Fast: the flames are the ignition, not its aftermath. Drawn out, they
+    // arrive once the shove and the char have both finished, and the card
+    // reads as having been kicked by a fire that was not there yet.
     .fire-flames {
-      animation: fire-flare-up 780ms cubic-bezier(0.2, 0.8, 0.3, 1)
-        $fire-flare-delay both;
+      animation: fire-rise 640ms cubic-bezier(0.3, 0.7, 0.4, 1)
+        $fire-burst-delay both;
       opacity: 1;
-      transition-delay: $fire-flare-delay;
+      transition-delay: $fire-burst-delay;
     }
 
     .fire-embers {
