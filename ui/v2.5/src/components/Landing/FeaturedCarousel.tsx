@@ -38,7 +38,7 @@ const PREVIEW_DELAY_MS = 1000;
 // SLIDE_DURATION_MS + SLIDE_TRANSITION_MS. Keep it comfortably above
 // PREVIEW_DELAY_MS or unlocked slides will move on before their preview has
 // had a chance to start.
-const SLIDE_DURATION_MS = 20000;
+const SLIDE_DURATION_MS = 15000;
 
 // how long the crossfade between slides takes.
 const SLIDE_TRANSITION_MS = 600;
