@@ -18,6 +18,7 @@ Read [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) first for build/run instructions
 | 06 | [Recipes & gotchas](06-recipes-and-gotchas.md) | You want the concrete "add a field end-to-end" walkthrough and the list of traps |
 | 07 | [This fork](07-this-fork.md) | You want to know what diverges from upstream `develop` on this branch |
 | 08 | [Frontend component map](08-frontend-components.md) | You want to know what components exist, how they nest, and where to add a new one |
+| 09 | [Parallel experiments](09-parallel-experiments.md) | You want several throwaway feature branches running against one shared library |
 
 Docs 05 and 08 are a pair: **05 is the frontend's frameworks** (list contexts, filter model,
 patching, config), **08 is its components** (page archetypes, cards, players, dialogs, and
