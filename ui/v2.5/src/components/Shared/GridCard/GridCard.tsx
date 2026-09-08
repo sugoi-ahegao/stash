@@ -31,8 +31,9 @@ interface ICardProps {
   interactiveHeatmap?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
-  // decorative layer painted behind the card's content
-  backdrop?: JSX.Element;
+  // decorative layers; each one positions itself relative to the card's
+  // content with z-index, so they can sit behind it, in front of it, or both
+  decorations?: JSX.Element;
 
   // move logic - both of the following are required to enable move dragging
   objectId?: string; // required for move dragging
@@ -239,7 +240,7 @@ export const GridCard: React.FC<ICardProps> = PatchComponent(
             : {}
         }
       >
-        {props.backdrop}
+        {props.decorations}
         {moveTarget !== undefined && <MoveTarget dragSide={moveTarget} />}
         <Controls>
           {props.onSelectedChanged && (

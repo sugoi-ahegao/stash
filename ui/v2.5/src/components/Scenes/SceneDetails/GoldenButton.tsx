@@ -3,7 +3,7 @@ import cx from "classnames";
 import { Button, Spinner } from "react-bootstrap";
 import { Icon } from "src/components/Shared/Icon";
 import { defineMessages, useIntl } from "react-intl";
-import { faCrown } from "@fortawesome/free-solid-svg-icons";
+import { faFire } from "@fortawesome/free-solid-svg-icons";
 
 export interface IGoldenButtonProps {
   loading: boolean;
@@ -35,7 +35,7 @@ export const GoldenButton: React.FC<IGoldenButtonProps> = (
       )}
       onClick={props.onClick}
     >
-      <Icon icon={faCrown} />
+      <Icon icon={faFire} />
     </Button>
   );
 };

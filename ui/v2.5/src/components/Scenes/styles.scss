@@ -374,7 +374,8 @@ input[type="range"].filter-slider {
 
 @mixin contrast-slider() {
   background: rgb(255, 255, 255);
-  background: linear-gradient(
+  background:
+    linear-gradient(
       -1deg,
       rgba(255, 255, 255, 1) 0%,
       rgba(255, 255, 255, 1) 40%,
@@ -1032,50 +1033,85 @@ input[type="range"].blue-slider {
 
 /* Golden scenes.
  *
- * Until it is woken, a golden card is an ordinary card - no gold, no motion,
- * nothing to distinguish it in the grid. It wakes only after a deliberate
- * hover: SceneCard runs a goldenActivationDelay timer and adds .awake, and
- * never takes it back, so once earned the rim keeps travelling and the sweep
- * keeps coming round. Idle golden cards animate nothing at all.
+ * A golden scene burns. Until it is woken, though, a golden card is an
+ * ordinary card - no fire, no glow, no motion, nothing to distinguish it in
+ * the grid. It wakes only after a deliberate hover: SceneCard runs a
+ * goldenActivationDelay timer and adds .awake, and never takes it back, so
+ * once earned the rim keeps burning and the flames keep licking. Idle golden
+ * cards animate nothing at all, which is what keeps a screenful of them cheap
+ * - only the card under the cursor is ever alight.
  *
- * The gold is opaque, so it can't live on the card's own background - that
- * couldn't fade in, and gradients don't interpolate. It gets its own layer
- * instead (.golden-surface, painted behind the card's content), and fading
- * that layer in is what turns the card to metal.
+ * The layers, back to front (SceneFire.tsx renders them):
+ *
+ *   .fire-surface   the charred ground the card sits on          z-index -1
+ *   &::before       the burning rim, and the glow it throws      z-index 10
+ *   .fire-flames    tongues licking up around the card's edges   z-index 11
+ *   .fire-embers    sparks coming off the card                   z-index 12
+ *   .card-section   the title, in front of its own fire          z-index 13
+ *
+ * The flames and embers blend with `screen`, so their near-black background
+ * drops out and only the light they add survives: fire over the preview
+ * rather than fire instead of it. That is also why the card sets `isolation`
+ * - the blending has to stay inside the card and not reach the page behind
+ * it - and why the surface is a layer of its own rather than the card's own
+ * background, which could neither be blended against nor faded in.
  */
-$golden-sweep-duration: 900ms;
-$golden-sweep-cycle: 5s;
-$golden-settle-duration: 400ms;
-$golden-settle-offset: $golden-sweep-duration * 0.55;
+$fire-settle-duration: 400ms;
+$fire-settle-offset: 500ms;
 
-// The travel occupies the first $golden-sweep-duration of $golden-sweep-cycle
-// (900ms of 5s, so 18%); the rest of the cycle is spent parked offscreen at
-// zero opacity, which is what puts a pause between passes.
-@keyframes golden-sweep {
+// A tongue rises, narrows, leans and drops back. Each one runs at its own
+// duration with a negative delay, so they are all mid-flame on the first
+// frame and never line up with each other.
+@keyframes fire-tongue {
+  0% {
+    opacity: 0.55;
+    transform: translateY(6%) scale(1, 0.72) skewX(0deg);
+  }
+
+  22% {
+    opacity: 0.95;
+    transform: translateY(-3%) scale(0.88, 1.08) skewX(3deg);
+  }
+
+  47% {
+    opacity: 0.72;
+    transform: translateY(3%) scale(1.08, 0.86) skewX(-4deg);
+  }
+
+  71% {
+    opacity: 1;
+    transform: translateY(-5%) scale(0.92, 1.16) skewX(2deg);
+  }
+
+  100% {
+    opacity: 0.55;
+    transform: translateY(6%) scale(1, 0.72) skewX(0deg);
+  }
+}
+
+// Sparks lift off the fire, drift sideways and burn out before the top.
+@keyframes fire-ember {
   0% {
     opacity: 0;
-    transform: translateX(-120%) skewX(-18deg);
+    transform: translate(0, 0) scale(0.5);
   }
 
-  3% {
+  10% {
     opacity: 1;
   }
 
-  15% {
-    opacity: 1;
-  }
-
-  18% {
-    opacity: 0;
-    transform: translateX(320%) skewX(-18deg);
+  70% {
+    opacity: 0.7;
   }
 
   100% {
     opacity: 0;
-    transform: translateX(320%) skewX(-18deg);
+    transform: translate(var(--fire-ember-drift), -180px) scale(0.2);
   }
 }
-@keyframes golden-shine {
+
+// The rim's colour travels around the card, so the hot spot on the edge moves.
+@keyframes fire-rim-travel {
   0% {
     background-position: 0 50%;
   }
@@ -1085,57 +1121,260 @@ $golden-settle-offset: $golden-sweep-duration * 0.55;
   }
 }
 
+// ...and the whole rim breathes, on a period that doesn't divide into the
+// travel, so the edge never repeats exactly.
+@keyframes fire-rim-flicker {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+
+  17% {
+    opacity: 1;
+  }
+
+  34% {
+    opacity: 0.7;
+  }
+
+  53% {
+    opacity: 0.95;
+  }
+
+  76% {
+    opacity: 0.78;
+  }
+}
+
 .golden-button {
   &.not-golden {
     color: rgba(191, 204, 214, 0.5);
   }
 
   &.golden {
-    color: #e0a92a;
-    filter: drop-shadow(0 0 3px rgba(255, 200, 80, 0.6));
+    color: #ff8a1f;
+    filter: drop-shadow(0 0 4px rgba(255, 120, 30, 0.75));
   }
 }
 
-// The metal. Layers, front to back: the specular edge of the blade sweep, the
-// shadow it casts, and the overall sheen. The surface is left clean - patterned
-// fills read as printed stock rather than polished metal.
-.golden-surface {
-  background-color: #f0dc92;
+// The charred card stock: near-black, with the heat of the fire soaking
+// up into it from below.
+.fire-surface {
+  background-color: #0d0906;
   background-image:
-    linear-gradient(
-      118deg,
-      rgba(255, 252, 232, 0) 34%,
-      rgba(255, 252, 232, 0.75) 41%,
-      rgba(255, 252, 232, 0.15) 44%,
-      rgba(255, 252, 232, 0.85) 47%,
-      rgba(255, 252, 232, 0) 53%
+    radial-gradient(
+      130% 70% at 50% 106%,
+      rgba(255, 146, 44, 0.5),
+      rgba(150, 44, 8, 0.22) 42%,
+      rgba(13, 9, 6, 0) 72%
     ),
-    linear-gradient(
-      118deg,
-      rgba(150, 114, 24, 0) 46%,
-      rgba(150, 114, 24, 0.35) 55%,
-      rgba(150, 114, 24, 0) 63%
-    ),
-    linear-gradient(
-      160deg,
-      rgba(255, 250, 224, 0.55),
-      rgba(255, 250, 224, 0.12) 30%,
-      rgba(138, 106, 30, 0.18) 62%,
-      rgba(255, 250, 224, 0.22) 88%,
-      rgba(138, 106, 30, 0.22)
-    );
-  background-repeat: no-repeat;
+    linear-gradient(180deg, #17110d, #0b0705);
+  border-radius: inherit;
   inset: 0;
   opacity: 0;
   pointer-events: none;
   position: absolute;
-  transition: opacity $golden-settle-duration ease-out;
+  transition: opacity $fire-settle-duration ease-out;
   z-index: -1;
+}
+
+.fire-flames {
+  bottom: -1%;
+  left: -8%;
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: -8%;
+  top: -6%;
+  transition: opacity $fire-settle-duration ease-out;
+  z-index: 11;
+}
+
+// One tongue of flame: white-hot at the base, falling off through orange to
+// nothing before the tip.
+//
+// The shape is an ellipse anchored at the base with a vertical radius of the
+// full height, so it tapers on its own - a squat blob reads as a glow, and it
+// is the taper plus the blur over it that reads as fire. Each tongue is
+// narrow and mostly transparent; the fire is the overlap of several of them,
+// not any one. Blur costs nothing to animate here, since transforms apply to
+// the filtered result: each tongue is rasterised once and then moved.
+//
+// They are placed around the card's edges rather than across its middle. The
+// card is meant to read as a dark thing that is burning, which it can only do
+// if most of it stays dark - and the two places a scene card can least afford
+// a wash of orange over it are the preview and the title.
+.fire-tongue {
+  background: radial-gradient(
+    ellipse 50% 100% at 50% 100%,
+    rgba(255, 250, 232, 0.8),
+    rgba(255, 206, 110, 0.5) 26%,
+    rgba(255, 130, 30, 0.26) 52%,
+    rgba(210, 55, 10, 0.09) 74%,
+    rgba(140, 28, 5, 0) 92%
+  );
+  bottom: 0;
+  filter: blur(7px);
+  position: absolute;
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+
+  // up the left edge
+  &:nth-child(1) {
+    animation: fire-tongue 2.6s ease-in-out -0.2s infinite;
+    height: 62%;
+    left: 1%;
+    width: 12%;
+  }
+
+  &:nth-child(2) {
+    animation: fire-tongue 3.4s ease-in-out -1.1s infinite;
+    bottom: 6%;
+    height: 88%;
+    left: 6%;
+    width: 10%;
+  }
+
+  // ...and up the right
+  &:nth-child(3) {
+    animation: fire-tongue 2.9s ease-in-out -0.6s infinite;
+    bottom: 4%;
+    height: 84%;
+    left: 84%;
+    width: 11%;
+  }
+
+  &:nth-child(4) {
+    animation: fire-tongue 3.7s ease-in-out -2.1s infinite;
+    height: 58%;
+    left: 89%;
+    width: 12%;
+  }
+
+  // along the bottom edge, low enough to leave the title alone
+  &:nth-child(5) {
+    animation: fire-tongue 3.1s ease-in-out -1.7s infinite;
+    height: 38%;
+    left: 24%;
+    width: 16%;
+  }
+
+  &:nth-child(6) {
+    animation: fire-tongue 2.7s ease-in-out -0.9s infinite;
+    bottom: 3%;
+    height: 30%;
+    left: 46%;
+    width: 14%;
+  }
+
+  &:nth-child(7) {
+    animation: fire-tongue 3.9s ease-in-out -1.4s infinite;
+    height: 42%;
+    left: 64%;
+    width: 15%;
+  }
+
+  // the one that climbs the face of the card, kept faint - it is the reason
+  // the fire reads as being in front of the scene rather than beside it.
+  &:nth-child(8) {
+    animation: fire-tongue 4.2s ease-in-out -0.5s infinite;
+    background: radial-gradient(
+      ellipse 50% 100% at 50% 100%,
+      rgba(255, 246, 214, 0.42),
+      rgba(255, 176, 70, 0.24) 30%,
+      rgba(224, 80, 16, 0.1) 58%,
+      rgba(140, 28, 5, 0) 86%
+    );
+    height: 78%;
+    left: 34%;
+    width: 20%;
+  }
+}
+
+.fire-embers {
+  inset: 0;
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity $fire-settle-duration ease-out;
+  z-index: 12;
+}
+
+.fire-ember {
+  background: #fff0c8;
+  border-radius: 50%;
+  bottom: 4%;
+  box-shadow:
+    0 0 4px 1px rgba(255, 190, 90, 0.95),
+    0 0 10px 2px rgba(255, 120, 30, 0.5);
+  height: 3px;
+  opacity: 0;
+  position: absolute;
+  width: 3px;
+  will-change: transform, opacity;
+
+  &:nth-child(1) {
+    --fire-ember-drift: -14px;
+
+    animation: fire-ember 4.2s linear 0s infinite;
+    left: 9%;
+  }
+
+  &:nth-child(2) {
+    --fire-ember-drift: 9px;
+
+    animation: fire-ember 5.1s linear 1.4s infinite;
+    left: 21%;
+  }
+
+  &:nth-child(3) {
+    --fire-ember-drift: -6px;
+
+    animation: fire-ember 3.8s linear 2.7s infinite;
+    height: 2px;
+    left: 34%;
+    width: 2px;
+  }
+
+  &:nth-child(4) {
+    --fire-ember-drift: 16px;
+
+    animation: fire-ember 4.7s linear 0.6s infinite;
+    left: 48%;
+  }
+
+  &:nth-child(5) {
+    --fire-ember-drift: -18px;
+
+    animation: fire-ember 5.6s linear 3.3s infinite;
+    height: 2px;
+    left: 63%;
+    width: 2px;
+  }
+
+  &:nth-child(6) {
+    --fire-ember-drift: 5px;
+
+    animation: fire-ember 4.1s linear 1.9s infinite;
+    left: 77%;
+  }
+
+  &:nth-child(7) {
+    --fire-ember-drift: -11px;
+
+    animation: fire-ember 5.2s linear 2.2s infinite;
+    height: 2px;
+    left: 90%;
+    width: 2px;
+  }
 }
 
 .scene-card.golden {
   // Contains the surface layer's negative z-index, so it sits above the card's
-  // own background but below the title and the preview.
+  // own background but below the content - and keeps the flames' screen
+  // blending inside the card.
   isolation: isolate;
   transition:
     box-shadow 300ms ease-out,
@@ -1151,28 +1390,32 @@ $golden-settle-offset: $golden-sweep-duration * 0.55;
     transition: color 300ms ease-out;
   }
 
-  .card-section-title {
-    transition:
-      color 300ms ease-out,
-      letter-spacing 300ms ease-out;
-  }
-
-  // The bevelled edge. A gradient can't be a border colour, so it fills the
-  // whole overlay and a mask punches out the middle, leaving only the rim.
+  // The burning edge. A gradient can't be a border colour, so it fills the
+  // whole overlay and a mask punches out the middle, leaving only the rim -
+  // and the drop-shadows then glow off that rim rather than off a rectangle.
   &::before {
+    // 90deg, not an angle: the rim is three times the card's width and is
+    // scrolled across it, so it tiles, and only a gradient whose bands are
+    // vertical meets its own repeat without a seam.
     background: linear-gradient(
-      115deg,
-      #8a6a1e,
-      #e8cf6a 16%,
-      #fffbe4 30%,
-      #d9bb54 44%,
-      #a8822a 58%,
-      #fff6d5 74%,
-      #8a6a1e
+      90deg,
+      #7a1f02,
+      #ff8a1f 9%,
+      #fff3c8 17%,
+      #ff6a10 27%,
+      #b83206 36%,
+      #ffb347 46%,
+      #fff3c8 55%,
+      #e8560c 66%,
+      #ffce7a 78%,
+      #ff8a1f 88%,
+      #7a1f02
     );
     background-size: 300% 100%;
     border-radius: inherit;
     content: "";
+    filter: drop-shadow(0 0 4px rgba(255, 140, 40, 0.9))
+      drop-shadow(0 0 14px rgba(255, 90, 20, 0.45));
     inset: 0;
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
@@ -1186,95 +1429,89 @@ $golden-settle-offset: $golden-sweep-duration * 0.55;
     padding: 2px;
     pointer-events: none;
     position: absolute;
-    transition: opacity $golden-settle-duration ease-out;
+    transition: opacity $fire-settle-duration ease-out;
     z-index: 10;
-  }
-
-  // The highlight that sweeps across the card. Sits above everything, so it
-  // crosses the preview as well as the metal.
-  &::after {
-    background: linear-gradient(
-      90deg,
-      rgba(255, 250, 220, 0),
-      rgba(255, 253, 240, 0.85),
-      rgba(255, 250, 220, 0)
-    );
-    bottom: 0;
-    content: "";
-    left: 0;
-    opacity: 0;
-    pointer-events: none;
-    position: absolute;
-    top: 0;
-    width: 35%;
-    z-index: 11;
   }
 
   &.awake {
     box-shadow:
-      0 0 0 1px rgba(255, 240, 180, 0.5),
-      0 6px 30px rgba(214, 168, 50, 0.6),
-      0 2px 10px rgba(0, 0, 0, 0.45);
-    // Inset the preview so the metal frames it, the way the image sits inside
-    // a trading card rather than running to its edge.
+      0 0 0 1px rgba(255, 150, 60, 0.35),
+      0 0 18px rgba(255, 110, 30, 0.45),
+      0 10px 40px rgba(230, 80, 15, 0.3),
+      0 2px 10px rgba(0, 0, 0, 0.6);
+    // Let the flames leave the card. The preview is clipped by the thumbnail
+    // section below instead, which is inset by the padding anyway.
+    overflow: visible;
+    // Inset the preview so the burning stock frames it, the way the image
+    // sits inside a trading card rather than running to its edge.
     padding: 5px 5px 0;
+    // ...and lift the whole card over its neighbours in the grid, so what
+    // leaves it isn't painted over by the next card along.
+    position: relative;
     transform: translateY(-2px);
     transition:
-      box-shadow $golden-settle-duration ease-out $golden-settle-offset,
-      padding $golden-settle-duration ease-out $golden-settle-offset,
-      transform $golden-settle-duration ease-out $golden-settle-offset;
+      box-shadow $fire-settle-duration ease-out $fire-settle-offset,
+      padding $fire-settle-duration ease-out $fire-settle-offset,
+      transform $fire-settle-duration ease-out $fire-settle-offset;
+    z-index: 3;
 
-    .golden-surface {
+    .fire-embers,
+    .fire-flames,
+    .fire-surface {
       opacity: 1;
-      transition-delay: $golden-settle-offset;
+      transition-delay: $fire-settle-offset;
     }
 
     &::before {
-      animation: golden-shine 4s linear $golden-settle-offset infinite;
+      animation:
+        fire-rim-travel 4s linear $fire-settle-offset infinite,
+        fire-rim-flicker 2.3s ease-in-out $fire-settle-offset infinite;
       opacity: 1;
-      transition-delay: $golden-settle-offset;
-    }
-
-    &::after {
-      animation: golden-sweep $golden-sweep-cycle ease-in-out infinite;
+      transition-delay: $fire-settle-offset;
     }
 
     .thumbnail-section {
+      border-radius: 4px;
       box-shadow:
-        0 0 0 1px rgba(90, 68, 12, 0.45),
-        inset 0 2px 6px rgba(0, 0, 0, 0.35);
+        0 0 0 1px rgba(255, 140, 50, 0.3),
+        inset 0 0 20px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
     }
 
-    // Text is stamped into the metal rather than laid on top of it, so it
-    // reads dark with a light edge below.
+    // The title sits in front of its own fire, so the flames lick up behind
+    // the text instead of washing it out.
+    .card-section {
+      position: relative;
+      z-index: 13;
+    }
+
     .card-section-title,
-    .scene-card__date,
-    .scene-card__details,
     a {
-      color: #3f320a;
-      text-shadow: 0 1px 0 rgba(255, 250, 220, 0.45);
+      color: #ffe6c0;
+      text-shadow:
+        0 0 10px rgba(255, 120, 30, 0.55),
+        0 1px 2px rgba(0, 0, 0, 0.9);
     }
 
-    .card-popovers .btn,
-    .file-path {
-      color: #5c4a12;
+    .file-path,
+    .scene-card__date,
+    .scene-card__details {
+      color: #d99b63;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+    }
+
+    .card-popovers .btn {
+      color: #f0b478;
     }
 
     hr {
-      border-top-color: rgba(90, 68, 12, 0.35);
-    }
-
-    .card-section-title {
-      letter-spacing: 0.02em;
-      transition:
-        color $golden-settle-duration ease-out $golden-settle-offset,
-        letter-spacing $golden-settle-duration ease-out $golden-settle-offset;
+      border-top-color: rgba(255, 120, 40, 0.25);
     }
   }
 }
 
-// Golden scenes still turn to metal without motion: waking a card brings up the
-// surface and the rim, but nothing travels and nothing repeats.
+// Golden scenes still catch light without motion: waking a card chars the
+// stock and lights the rim, but nothing travels, flickers or rises.
 @media (prefers-reduced-motion: reduce) {
   .scene-card.golden.awake {
     transform: none;
@@ -1283,7 +1520,11 @@ $golden-settle-offset: $golden-sweep-duration * 0.55;
       animation: none;
     }
 
-    &::after {
+    .fire-embers {
+      opacity: 0;
+    }
+
+    .fire-tongue {
       animation: none;
     }
   }

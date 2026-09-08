@@ -38,6 +38,7 @@ import { FileSize } from "../Shared/FileSize";
 import { OCounterButton } from "../Shared/CountButton";
 import { defaultPreviewVolume } from "src/core/config";
 import { goldenActivationDelay, isGolden } from "src/core/golden";
+import { SceneFire } from "./SceneFire";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -484,8 +485,9 @@ export const SceneCard = React.memo(
     const golden = isGolden(props.scene);
 
     // A golden card wakes up after a deliberate hover and then stays awake -
-    // the shine and the rim keep going once they've been earned, rather than
-    // dying with the cursor. Hence a timer here instead of a CSS hover delay.
+    // the flames and the rim keep burning once they've been earned, rather
+    // than dying with the cursor. Hence a timer here instead of a CSS hover
+    // delay.
     const [awake, setAwake] = useState(false);
     const wakeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -541,7 +543,7 @@ export const SceneCard = React.memo(
         onSelectedChanged={props.onSelectedChanged}
         onMouseEnter={golden ? onMouseEnter : undefined}
         onMouseLeave={golden ? onMouseLeave : undefined}
-        backdrop={golden ? <div className="golden-surface" /> : undefined}
+        decorations={golden ? <SceneFire /> : undefined}
       />
     );
   })
