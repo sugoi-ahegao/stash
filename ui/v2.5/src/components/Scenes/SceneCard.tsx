@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button, ButtonGroup, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { useHistory } from "react-router-dom";
 import cx from "classnames";
@@ -31,6 +37,7 @@ import { GroupTag } from "../Groups/GroupTag";
 import { FileSize } from "../Shared/FileSize";
 import { OCounterButton } from "../Shared/CountButton";
 import { defaultPreviewVolume } from "src/core/config";
+import { goldenActivationDelay, isGolden } from "src/core/golden";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -474,6 +481,33 @@ export const SceneCard = React.memo(
       return "";
     }
 
+    const golden = isGolden(props.scene);
+
+    // A golden card wakes up after a deliberate hover and then stays awake -
+    // the shine and the rim keep going once they've been earned, rather than
+    // dying with the cursor. Hence a timer here instead of a CSS hover delay.
+    const [awake, setAwake] = useState(false);
+    const wakeTimer = useRef<ReturnType<typeof setTimeout>>();
+
+    const onMouseEnter = useCallback(() => {
+      if (!golden || awake) return;
+      wakeTimer.current = setTimeout(
+        () => setAwake(true),
+        goldenActivationDelay
+      );
+    }, [golden, awake]);
+
+    const onMouseLeave = useCallback(() => {
+      clearTimeout(wakeTimer.current);
+    }, []);
+
+    useEffect(() => () => clearTimeout(wakeTimer.current), []);
+
+    function goldenClass() {
+      if (!golden) return "";
+      return awake ? "golden awake" : "golden";
+    }
+
     const cont = configuration?.interface.continuePlaylistDefault ?? false;
 
     const sceneLink = props.queue
@@ -485,7 +519,7 @@ export const SceneCard = React.memo(
 
     return (
       <GridCard
-        className={`scene-card ${zoomIndex()} ${filelessClass()}`}
+        className={`scene-card ${zoomIndex()} ${filelessClass()} ${goldenClass()}`}
         url={sceneLink}
         title={objectTitle(props.scene)}
         width={props.width}
@@ -505,6 +539,9 @@ export const SceneCard = React.memo(
         selected={props.selected}
         selecting={props.selecting}
         onSelectedChanged={props.onSelectedChanged}
+        onMouseEnter={golden ? onMouseEnter : undefined}
+        onMouseLeave={golden ? onMouseLeave : undefined}
+        backdrop={golden ? <div className="golden-surface" /> : undefined}
       />
     );
   })

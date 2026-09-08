@@ -1029,3 +1029,262 @@ input[type="range"].blue-slider {
     }
   }
 }
+
+/* Golden scenes.
+ *
+ * Until it is woken, a golden card is an ordinary card - no gold, no motion,
+ * nothing to distinguish it in the grid. It wakes only after a deliberate
+ * hover: SceneCard runs a goldenActivationDelay timer and adds .awake, and
+ * never takes it back, so once earned the rim keeps travelling and the sweep
+ * keeps coming round. Idle golden cards animate nothing at all.
+ *
+ * The gold is opaque, so it can't live on the card's own background - that
+ * couldn't fade in, and gradients don't interpolate. It gets its own layer
+ * instead (.golden-surface, painted behind the card's content), and fading
+ * that layer in is what turns the card to metal.
+ */
+$golden-sweep-duration: 900ms;
+$golden-sweep-cycle: 5s;
+$golden-settle-duration: 400ms;
+$golden-settle-offset: $golden-sweep-duration * 0.55;
+
+// The travel occupies the first $golden-sweep-duration of $golden-sweep-cycle
+// (900ms of 5s, so 18%); the rest of the cycle is spent parked offscreen at
+// zero opacity, which is what puts a pause between passes.
+@keyframes golden-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-18deg);
+  }
+
+  3% {
+    opacity: 1;
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  18% {
+    opacity: 0;
+    transform: translateX(320%) skewX(-18deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(320%) skewX(-18deg);
+  }
+}
+@keyframes golden-shine {
+  0% {
+    background-position: 0 50%;
+  }
+
+  100% {
+    background-position: 300% 50%;
+  }
+}
+
+.golden-button {
+  &.not-golden {
+    color: rgba(191, 204, 214, 0.5);
+  }
+
+  &.golden {
+    color: #e0a92a;
+    filter: drop-shadow(0 0 3px rgba(255, 200, 80, 0.6));
+  }
+}
+
+// The metal. Layers, front to back: the specular edge of the blade sweep, the
+// shadow it casts, and the overall sheen. The surface is left clean - patterned
+// fills read as printed stock rather than polished metal.
+.golden-surface {
+  background-color: #f0dc92;
+  background-image:
+    linear-gradient(
+      118deg,
+      rgba(255, 252, 232, 0) 34%,
+      rgba(255, 252, 232, 0.75) 41%,
+      rgba(255, 252, 232, 0.15) 44%,
+      rgba(255, 252, 232, 0.85) 47%,
+      rgba(255, 252, 232, 0) 53%
+    ),
+    linear-gradient(
+      118deg,
+      rgba(150, 114, 24, 0) 46%,
+      rgba(150, 114, 24, 0.35) 55%,
+      rgba(150, 114, 24, 0) 63%
+    ),
+    linear-gradient(
+      160deg,
+      rgba(255, 250, 224, 0.55),
+      rgba(255, 250, 224, 0.12) 30%,
+      rgba(138, 106, 30, 0.18) 62%,
+      rgba(255, 250, 224, 0.22) 88%,
+      rgba(138, 106, 30, 0.22)
+    );
+  background-repeat: no-repeat;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity $golden-settle-duration ease-out;
+  z-index: -1;
+}
+
+.scene-card.golden {
+  // Contains the surface layer's negative z-index, so it sits above the card's
+  // own background but below the title and the preview.
+  isolation: isolate;
+  transition:
+    box-shadow 300ms ease-out,
+    padding 300ms ease-out,
+    transform 300ms ease-out;
+
+  .card-popovers .btn,
+  .card-section-title,
+  .file-path,
+  .scene-card__date,
+  .scene-card__details,
+  a {
+    transition: color 300ms ease-out;
+  }
+
+  .card-section-title {
+    transition:
+      color 300ms ease-out,
+      letter-spacing 300ms ease-out;
+  }
+
+  // The bevelled edge. A gradient can't be a border colour, so it fills the
+  // whole overlay and a mask punches out the middle, leaving only the rim.
+  &::before {
+    background: linear-gradient(
+      115deg,
+      #8a6a1e,
+      #e8cf6a 16%,
+      #fffbe4 30%,
+      #d9bb54 44%,
+      #a8822a 58%,
+      #fff6d5 74%,
+      #8a6a1e
+    );
+    background-size: 300% 100%;
+    border-radius: inherit;
+    content: "";
+    inset: 0;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    padding: 2px;
+    pointer-events: none;
+    position: absolute;
+    transition: opacity $golden-settle-duration ease-out;
+    z-index: 10;
+  }
+
+  // The highlight that sweeps across the card. Sits above everything, so it
+  // crosses the preview as well as the metal.
+  &::after {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 250, 220, 0),
+      rgba(255, 253, 240, 0.85),
+      rgba(255, 250, 220, 0)
+    );
+    bottom: 0;
+    content: "";
+    left: 0;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: 35%;
+    z-index: 11;
+  }
+
+  &.awake {
+    box-shadow:
+      0 0 0 1px rgba(255, 240, 180, 0.5),
+      0 6px 30px rgba(214, 168, 50, 0.6),
+      0 2px 10px rgba(0, 0, 0, 0.45);
+    // Inset the preview so the metal frames it, the way the image sits inside
+    // a trading card rather than running to its edge.
+    padding: 5px 5px 0;
+    transform: translateY(-2px);
+    transition:
+      box-shadow $golden-settle-duration ease-out $golden-settle-offset,
+      padding $golden-settle-duration ease-out $golden-settle-offset,
+      transform $golden-settle-duration ease-out $golden-settle-offset;
+
+    .golden-surface {
+      opacity: 1;
+      transition-delay: $golden-settle-offset;
+    }
+
+    &::before {
+      animation: golden-shine 4s linear $golden-settle-offset infinite;
+      opacity: 1;
+      transition-delay: $golden-settle-offset;
+    }
+
+    &::after {
+      animation: golden-sweep $golden-sweep-cycle ease-in-out infinite;
+    }
+
+    .thumbnail-section {
+      box-shadow:
+        0 0 0 1px rgba(90, 68, 12, 0.45),
+        inset 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    // Text is stamped into the metal rather than laid on top of it, so it
+    // reads dark with a light edge below.
+    .card-section-title,
+    .scene-card__date,
+    .scene-card__details,
+    a {
+      color: #3f320a;
+      text-shadow: 0 1px 0 rgba(255, 250, 220, 0.45);
+    }
+
+    .card-popovers .btn,
+    .file-path {
+      color: #5c4a12;
+    }
+
+    hr {
+      border-top-color: rgba(90, 68, 12, 0.35);
+    }
+
+    .card-section-title {
+      letter-spacing: 0.02em;
+      transition:
+        color $golden-settle-duration ease-out $golden-settle-offset,
+        letter-spacing $golden-settle-duration ease-out $golden-settle-offset;
+    }
+  }
+}
+
+// Golden scenes still turn to metal without motion: waking a card brings up the
+// surface and the rim, but nothing travels and nothing repeats.
+@media (prefers-reduced-motion: reduce) {
+  .scene-card.golden.awake {
+    transform: none;
+
+    &::before {
+      animation: none;
+    }
+
+    &::after {
+      animation: none;
+    }
+  }
+}

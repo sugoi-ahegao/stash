@@ -29,6 +29,10 @@ interface ICardProps {
   resumeTime?: number;
   duration?: number;
   interactiveHeatmap?: string;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
+  // decorative layer painted behind the card's content
+  backdrop?: JSX.Element;
 
   // move logic - both of the following are required to enable move dragging
   objectId?: string; // required for move dragging
@@ -226,6 +230,8 @@ export const GridCard: React.FC<ICardProps> = PatchComponent(
       <Card
         className={cx(props.className, "grid-card")}
         onClick={handleImageClick}
+        onMouseEnter={props.onMouseEnter}
+        onMouseLeave={props.onMouseLeave}
         {...dragProps}
         style={
           props.width && !ScreenUtils.isMobile()
@@ -233,6 +239,7 @@ export const GridCard: React.FC<ICardProps> = PatchComponent(
             : {}
         }
       >
+        {props.backdrop}
         {moveTarget !== undefined && <MoveTarget dragSide={moveTarget} />}
         <Controls>
           {props.onSelectedChanged && (

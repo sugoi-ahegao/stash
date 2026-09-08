@@ -31,6 +31,7 @@ import SceneQueue, { QueuedScene } from "src/models/sceneQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
+import { GoldenButton } from "./GoldenButton";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
   getAbLoopPlugin,
@@ -57,6 +58,7 @@ import { SceneMergeModal } from "../SceneMergeDialog";
 import { goBackOrReplace } from "src/utils/history";
 import { FormattedDate } from "src/components/Shared/Date";
 import { StudioLogo } from "src/components/Shared/StudioLogo";
+import { isGolden, withGolden } from "src/core/golden";
 
 const SubmitStashBoxDraft = lazyComponent(
   () => import("src/components/Dialogs/SubmitDraft")
@@ -224,6 +226,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   }, [scene.id, incrementPlay, configuration?.ui?.trackActivity]);
 
   const [organizedLoading, setOrganizedLoading] = useState(false);
+  const [goldenLoading, setGoldenLoading] = useState(false);
 
   const [activeTabKey, setActiveTabKey] = useState("scene-details-panel");
 
@@ -332,6 +335,26 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
       Toast.error(e);
     } finally {
       setOrganizedLoading(false);
+    }
+  };
+
+  const golden = isGolden(scene);
+
+  const onGoldenClick = async () => {
+    try {
+      setGoldenLoading(true);
+      await updateScene({
+        variables: {
+          input: {
+            id: scene.id,
+            tag_ids: withGolden(scene, !golden),
+          },
+        },
+      });
+    } catch (e) {
+      Toast.error(e);
+    } finally {
+      setGoldenLoading(false);
     }
   };
 
@@ -720,6 +743,11 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                 onSetRating={setRating}
                 clickToRate
                 withoutContext
+              />
+              <GoldenButton
+                loading={goldenLoading}
+                golden={golden}
+                onClick={onGoldenClick}
               />
             </span>
             <span className="scene-toolbar-group">
