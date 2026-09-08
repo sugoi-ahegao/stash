@@ -64,3 +64,8 @@ node_modules
 dist
 .DS_Store
 /.local*
+
+# Python (ui/v2.5/scripts)
+__pycache__/
+*.py[cod]
+.venv/
