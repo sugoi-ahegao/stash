@@ -20,10 +20,11 @@ import { useConfigurationContext } from "src/hooks/Config";
 import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
 import { GridCard } from "../Shared/GridCard/GridCard";
 import { RatingBanner } from "../Shared/RatingBanner";
-import { FormattedMessage } from "react-intl";
+import { FormattedMessage, useIntl } from "react-intl";
 import {
   faBox,
   faCopy,
+  faEye,
   faFilm,
   faImages,
   faMapMarkerAlt,
@@ -42,6 +43,8 @@ import { hoverPlayDelay } from "src/core/hoverPlay";
 import { SceneFire } from "./SceneFire";
 import { View } from "../List/views";
 import { useSceneIncrementPlayCount } from "src/core/StashService";
+import { useToast } from "src/hooks/Toast";
+import { playedToday } from "src/core/played";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -146,6 +149,58 @@ const Description: React.FC<{
     </>
   );
 };
+
+// One-click "I watched this" for the card grid: stamps a play at the current
+// time, exactly as the scene page's play count button does. Sits with the
+// count buttons at the foot of the card.
+//
+// It lights up while the scene's last play falls on today, which needs no
+// local state: the mutation writes last_played_at into the cache, so the
+// button reads its own result back and stays lit until midnight.
+const MarkPlayedButton: React.FC<{
+  sceneID: string;
+  lastPlayedAt?: string | null;
+  disabled?: boolean;
+}> = PatchComponent(
+  "SceneCard.MarkPlayedButton",
+  ({ sceneID, lastPlayedAt, disabled }) => {
+    const intl = useIntl();
+    const Toast = useToast();
+
+    // no list eviction - refetching the list would replace the grid with a
+    // spinner and drop the card being clicked. See useSceneIncrementPlayCount.
+    const [incrementPlay] = useSceneIncrementPlayCount(false);
+
+    const playedTodayNow = playedToday(lastPlayedAt);
+
+    async function onClick(event: React.MouseEvent) {
+      // the card behind the button navigates and selects
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (disabled) return;
+
+      try {
+        await incrementPlay({ variables: { id: sceneID } });
+      } catch (e) {
+        Toast.error(e);
+      }
+    }
+
+    return (
+      <Button
+        variant="secondary"
+        className={cx("minimal", "mark-played-button", {
+          "played-today": playedTodayNow,
+        })}
+        title={intl.formatMessage({ id: "actions.add_play" })}
+        onClick={onClick}
+      >
+        <Icon icon={faEye} />
+      </Button>
+    );
+  }
+);
 
 const SceneCardPopovers = React.memo(
   PatchComponent("SceneCard.Popovers", (props: ISceneCardProps) => {
@@ -284,6 +339,16 @@ const SceneCardPopovers = React.memo(
       }
     }
 
+    function renderMarkPlayed() {
+      return (
+        <MarkPlayedButton
+          sceneID={props.scene.id}
+          lastPlayedAt={props.scene.last_played_at}
+          disabled={props.selecting}
+        />
+      );
+    }
+
     function maybeRenderDupeCopies() {
       const phash = file
         ? file.fingerprints.find((fp) => fp.type === "phash")
@@ -303,18 +368,11 @@ const SceneCardPopovers = React.memo(
       }
     }
 
+    // the mark-played button lives in this row and is always available, so
+    // the row itself is now unconditional on anything but compact cards -
+    // it used to appear only when the scene had something to count.
     function maybeRenderPopoverButtonGroup() {
-      if (
-        !props.compact &&
-        (props.scene.tags.length > 0 ||
-          props.scene.performers.length > 0 ||
-          props.scene.groups.length > 0 ||
-          props.scene.scene_markers.length > 0 ||
-          props.scene?.o_counter ||
-          props.scene.galleries.length > 0 ||
-          props.scene.organized ||
-          sceneNumber !== undefined)
-      ) {
+      if (!props.compact) {
         return (
           <>
             <Description sceneNumber={sceneNumber} />
@@ -328,6 +386,7 @@ const SceneCardPopovers = React.memo(
               {maybeRenderGallery()}
               {maybeRenderOrganized()}
               {maybeRenderDupeCopies()}
+              {renderMarkPlayed()}
             </ButtonGroup>
           </>
         );

@@ -201,6 +201,26 @@ textarea.scene-description {
 // One-click "mark as played", sat in the card's count row beside the tag
 // and performer buttons. It briefly goes green to confirm the play, since
 // the card shows no play count to tick over.
+// The other entries in this row are wrapped in a popover or a nested button
+// group, so bootstrap's `.btn-group > .btn { flex: 1 1 auto }` catches only
+// this one, and stretches it across the row with its icon stranded in the
+// middle. Overriding that needs to outweigh two classes, hence .btn here.
+.card-popovers .btn.mark-played-button {
+  flex: 0 0 auto;
+  transition: color 0.2s ease;
+
+  // the row's icons are followed by a count, so they carry a right margin.
+  // This one stands alone and would sit off-centre with it.
+  .fa-icon {
+    margin-right: 0;
+  }
+
+  // lit while the scene's last play falls on today
+  &.played-today {
+    color: #5cb85c;
+  }
+}
+
 .extra-scene-info {
   display: none;
 }
