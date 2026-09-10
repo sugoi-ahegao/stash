@@ -1,4 +1,4 @@
-import { FEATURE_UNLOCKED_AT_FIELD } from "./featuredGroup";
+import { FEATURE_UNLOCKED_AT_FIELD } from "src/core/featured";
 
 // --- tunables - change these to adjust how the featured carousel behaves ---
 

@@ -11,8 +11,8 @@ import (
 )
 
 // The featured group drives the landing page carousel. These are kept in sync
-// with ui/v2.5/src/components/Landing/featuredGroup.ts - there's no config
-// setting to choose the featured group yet.
+// with ui/v2.5/src/core/featured.ts - there's no config setting to choose the
+// featured group yet.
 const featuredGroupID = 25
 
 const (

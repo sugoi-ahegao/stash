@@ -32,6 +32,7 @@ import { ListFilterModel } from "src/models/list-filter/filter";
 import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
 import { GoldenButton } from "./GoldenButton";
+import { FeaturedButton } from "./FeaturedButton";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
   getAbLoopPlugin,
@@ -59,6 +60,7 @@ import { goBackOrReplace } from "src/utils/history";
 import { FormattedDate } from "src/components/Shared/Date";
 import { StudioLogo } from "src/components/Shared/StudioLogo";
 import { isGolden, withGolden } from "src/core/golden";
+import { isFeatured, withFeatured } from "src/core/featured";
 
 const SubmitStashBoxDraft = lazyComponent(
   () => import("src/components/Dialogs/SubmitDraft")
@@ -227,6 +229,7 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
 
   const [organizedLoading, setOrganizedLoading] = useState(false);
   const [goldenLoading, setGoldenLoading] = useState(false);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
 
   const [activeTabKey, setActiveTabKey] = useState("scene-details-panel");
 
@@ -335,6 +338,28 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
       Toast.error(e);
     } finally {
       setOrganizedLoading(false);
+    }
+  };
+
+  const featured = isFeatured(scene);
+
+  // toggling the featured group is a plain scene update - the server stamps
+  // featured_added_at and kicks off generation when the scene joins.
+  const onFeaturedClick = async () => {
+    try {
+      setFeaturedLoading(true);
+      await updateScene({
+        variables: {
+          input: {
+            id: scene.id,
+            groups: withFeatured(scene, !featured),
+          },
+        },
+      });
+    } catch (e) {
+      Toast.error(e);
+    } finally {
+      setFeaturedLoading(false);
     }
   };
 
@@ -748,6 +773,11 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                 loading={goldenLoading}
                 golden={golden}
                 onClick={onGoldenClick}
+              />
+              <FeaturedButton
+                loading={featuredLoading}
+                featured={featured}
+                onClick={onFeaturedClick}
               />
             </span>
             <span className="scene-toolbar-group">

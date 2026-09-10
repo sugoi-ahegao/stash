@@ -198,6 +198,9 @@ textarea.scene-description {
   left: 0.7rem;
 }
 
+// One-click "mark as played", sat in the card's count row beside the tag
+// and performer buttons. It briefly goes green to confirm the play, since
+// the card shows no play count to tick over.
 .extra-scene-info {
   display: none;
 }
@@ -1274,6 +1277,17 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
   &.golden {
     color: #ff8a1f;
     filter: drop-shadow(0 0 4px rgba(255, 120, 30, 0.75));
+  }
+}
+
+.featured-button {
+  &.not-featured {
+    color: rgba(191, 204, 214, 0.5);
+  }
+
+  &.featured {
+    color: #e8c15a;
+    filter: drop-shadow(0 0 4px rgba(232, 193, 90, 0.7));
   }
 }
 

@@ -10,7 +10,7 @@ import {
   FEATURED_ADDED_AT_FIELD,
   FEATURED_GROUP_ID,
   FEATURE_UNLOCKED_AT_FIELD,
-} from "./featuredGroup";
+} from "src/core/featured";
 import {
   canUnlockMore,
   isUnlockExpired,
