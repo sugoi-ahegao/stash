@@ -7,6 +7,7 @@ import {
   useContainerDimensions,
 } from "../Shared/GridCard/GridCard";
 import { PatchComponent } from "src/patch";
+import { View } from "../List/views";
 
 interface ISceneCardGrid {
   scenes: GQL.SlimSceneDataFragment[];
@@ -15,13 +16,22 @@ interface ISceneCardGrid {
   zoomIndex: number;
   onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
   fromGroupId?: string;
+  view?: View;
 }
 
 const zoomWidths = [280, 340, 480, 640];
 
 export const SceneCardGrid: React.FC<ISceneCardGrid> = PatchComponent(
   "SceneCardGrid",
-  ({ scenes, queue, selectedIds, zoomIndex, onSelectChange, fromGroupId }) => {
+  ({
+    scenes,
+    queue,
+    selectedIds,
+    zoomIndex,
+    onSelectChange,
+    fromGroupId,
+    view,
+  }) => {
     const [componentRef, { width: containerWidth }] = useContainerDimensions();
 
     const cardWidth = useCardWidth(containerWidth, zoomIndex, zoomWidths);
@@ -42,6 +52,7 @@ export const SceneCardGrid: React.FC<ISceneCardGrid> = PatchComponent(
               onSelectChange(scene.id, selected, shiftKey)
             }
             fromGroupId={fromGroupId}
+            view={view}
           />
         ))}
       </div>

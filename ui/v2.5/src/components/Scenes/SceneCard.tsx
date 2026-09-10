@@ -38,7 +38,10 @@ import { FileSize } from "../Shared/FileSize";
 import { OCounterButton } from "../Shared/CountButton";
 import { defaultPreviewVolume } from "src/core/config";
 import { goldenActivationDelay, isGolden } from "src/core/golden";
+import { hoverPlayDelay } from "src/core/hoverPlay";
 import { SceneFire } from "./SceneFire";
+import { View } from "../List/views";
+import { useSceneIncrementPlayCount } from "src/core/StashService";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -124,6 +127,7 @@ interface ISceneCardProps {
   zoomIndex?: number;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   fromGroupId?: string;
+  view?: View;
 }
 
 const Description: React.FC<{
@@ -491,19 +495,46 @@ export const SceneCard = React.memo(
     const [awake, setAwake] = useState(false);
     const wakeTimer = useRef<ReturnType<typeof setTimeout>>();
 
+    // On the landing page, dwelling on a card counts as a play - the same
+    // thing opening the scene page does. Counted once per card: leaving and
+    // coming back to the same card doesn't play it again.
+    const hoverPlays =
+      props.view === View.Landing && configuration?.ui?.trackActivity !== false;
+
+    // no list eviction: refetching the scene list would replace the grid with
+    // a spinner and drop the card the cursor is sitting on.
+    const [incrementPlay] = useSceneIncrementPlayCount(false);
+    const playTimer = useRef<ReturnType<typeof setTimeout>>();
+    const played = useRef(false);
+
     const onMouseEnter = useCallback(() => {
-      if (!golden || awake) return;
-      wakeTimer.current = setTimeout(
-        () => setAwake(true),
-        goldenActivationDelay
-      );
-    }, [golden, awake]);
+      if (golden && !awake) {
+        wakeTimer.current = setTimeout(
+          () => setAwake(true),
+          goldenActivationDelay
+        );
+      }
+
+      if (hoverPlays && !played.current) {
+        playTimer.current = setTimeout(() => {
+          played.current = true;
+          incrementPlay({ variables: { id: props.scene.id } });
+        }, hoverPlayDelay);
+      }
+    }, [golden, awake, hoverPlays, incrementPlay, props.scene.id]);
 
     const onMouseLeave = useCallback(() => {
       clearTimeout(wakeTimer.current);
+      clearTimeout(playTimer.current);
     }, []);
 
-    useEffect(() => () => clearTimeout(wakeTimer.current), []);
+    useEffect(
+      () => () => {
+        clearTimeout(wakeTimer.current);
+        clearTimeout(playTimer.current);
+      },
+      []
+    );
 
     function goldenClass() {
       if (!golden) return "";
@@ -541,8 +572,8 @@ export const SceneCard = React.memo(
         selected={props.selected}
         selecting={props.selecting}
         onSelectedChanged={props.onSelectedChanged}
-        onMouseEnter={golden ? onMouseEnter : undefined}
-        onMouseLeave={golden ? onMouseLeave : undefined}
+        onMouseEnter={golden || hoverPlays ? onMouseEnter : undefined}
+        onMouseLeave={golden || hoverPlays ? onMouseLeave : undefined}
         decorations={golden ? <SceneFire /> : undefined}
       />
     );

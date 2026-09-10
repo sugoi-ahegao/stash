@@ -185,9 +185,10 @@ const SceneList: React.FC<{
   selectedIds: Set<string>;
   onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
   fromGroupId?: string;
+  view?: View;
 }> = PatchComponent(
   "SceneList",
-  ({ scenes, filter, selectedIds, onSelectChange, fromGroupId }) => {
+  ({ scenes, filter, selectedIds, onSelectChange, fromGroupId, view }) => {
     const queue = useMemo(
       () => SceneQueue.fromListFilterModel(filter),
       [filter]
@@ -206,6 +207,7 @@ const SceneList: React.FC<{
           selectedIds={selectedIds}
           onSelectChange={onSelectChange}
           fromGroupId={fromGroupId}
+          view={view}
         />
       );
     }
@@ -715,6 +717,7 @@ export const FilteredSceneList = PatchComponent(
                     selectedIds={selectedIds}
                     onSelectChange={onSelectChange}
                     fromGroupId={fromGroupId}
+                    view={view}
                   />
                 </LoadedContent>
 
