@@ -32,13 +32,14 @@ const FEATURED_COUNT = 10;
 // video; the timer resets whenever the slide stops being active.
 const PREVIEW_DELAY_MS = 1000;
 
-// how long a slide stays on screen before the carousel advances. Hovering
-// the carousel pauses the timer (pauseOnHover), and it does not start until
-// the previous transition has finished, so a slide is actually up for about
-// SLIDE_DURATION_MS + SLIDE_TRANSITION_MS. Keep it comfortably above
+// how long a slide stays on screen before the carousel advances. The timer
+// runs regardless of the pointer (pauseOnHover is off), and it does not start
+// until the previous transition has finished, so a slide is actually up for
+// about SLIDE_DURATION_MS + SLIDE_TRANSITION_MS. Keep it comfortably above
 // PREVIEW_DELAY_MS or unlocked slides will move on before their preview has
-// had a chance to start.
-const SLIDE_DURATION_MS = 15000;
+// had a chance to start, and above HOLD_DURATION_MS so a hold on a locked
+// slide has time to finish before the slide is swapped out.
+const SLIDE_DURATION_MS = 10000;
 
 // how long the crossfade between slides takes.
 const SLIDE_TRANSITION_MS = 600;
@@ -404,7 +405,8 @@ export const FeaturedCarousel: React.FC = () => {
         autoplaySpeed={SLIDE_DURATION_MS}
         speed={SLIDE_TRANSITION_MS}
         fade
-        pauseOnHover
+        // defaults to true in react-slick, so turn it off explicitly
+        pauseOnHover={false}
         slidesToShow={1}
         slidesToScroll={1}
         afterChange={(index: number) => setActiveIndex(index)}
