@@ -19,6 +19,7 @@ import {
   queryFindScenes,
   queryFindScenesByID,
   useSceneIncrementPlayCount,
+  useSceneAddView,
 } from "src/core/StashService";
 
 import { SceneEditPanel } from "./SceneEditPanel";
@@ -212,20 +213,22 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     });
   }
 
-  // opening the scene page counts as a play, with no play duration.
-  // the player itself doesn't increment the play count - see ScenePlayer.
-  const playedSceneID = useRef<string>();
+  // Opening the scene page records a VIEW, not a play - the player still owns
+  // play count and play duration exactly as upstream. Guarded by a ref so
+  // StrictMode's double-invoke records it once.
+  const [addView] = useSceneAddView();
+  const viewedSceneID = useRef<string>();
   useEffect(() => {
     if (configuration?.ui?.trackActivity === false) return;
-    if (playedSceneID.current === scene.id) return;
+    if (viewedSceneID.current === scene.id) return;
 
-    playedSceneID.current = scene.id;
-    incrementPlay({
+    viewedSceneID.current = scene.id;
+    addView({
       variables: {
         id: scene.id,
       },
     });
-  }, [scene.id, incrementPlay, configuration?.ui?.trackActivity]);
+  }, [scene.id, addView, configuration?.ui?.trackActivity]);
 
   const [organizedLoading, setOrganizedLoading] = useState(false);
   const [goldenLoading, setGoldenLoading] = useState(false);

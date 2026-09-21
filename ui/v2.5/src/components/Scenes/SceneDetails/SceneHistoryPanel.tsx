@@ -19,6 +19,9 @@ import {
   useSceneResetO,
   useSceneResetPlayCount,
   useSceneResetActivity,
+  useSceneAddView,
+  useSceneDeleteView,
+  useSceneResetViewCount,
 } from "src/core/StashService";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext } from "src/hooks/Config";
@@ -179,8 +182,10 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
   const [dialogs, setDialogs] = React.useState({
     playHistory: false,
     oHistory: false,
+    viewHistory: false,
     addPlay: false,
     addO: false,
+    addView: false,
   });
 
   function setDialogPartial(partial: Partial<typeof dialogs>) {
@@ -193,6 +198,9 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
   const [incrementOCount] = useSceneIncrementO(scene.id);
   const [decrementOCount] = useSceneDecrementO(scene.id);
   const [resetO] = useSceneResetO(scene.id);
+  const [addView] = useSceneAddView(true);
+  const [deleteView] = useSceneDeleteView();
+  const [resetViewCount] = useSceneResetViewCount();
   const [resetResume] = useSceneResetActivity(scene.id, true, false);
   const [resetDuration] = useSceneResetActivity(scene.id, false, true);
 
@@ -250,6 +258,33 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
   function handleClearODates() {
     setDialogPartial({ oHistory: false });
     resetO({
+      variables: {
+        id: scene.id,
+      },
+    });
+  }
+
+  function handleAddViewDate(time?: string) {
+    addView({
+      variables: {
+        id: scene.id,
+        times: time ? [time] : undefined,
+      },
+    });
+  }
+
+  function handleDeleteViewDate(time: string) {
+    deleteView({
+      variables: {
+        id: scene.id,
+        times: time ? [time] : undefined,
+      },
+    });
+  }
+
+  function handleClearViewDates() {
+    setDialogPartial({ viewHistory: false });
+    resetViewCount({
       variables: {
         id: scene.id,
       },
@@ -318,6 +353,15 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
           onCancel={() => setDialogPartial({ playHistory: false })}
         />
         <AlertModal
+          show={dialogs.viewHistory}
+          text={intl.formatMessage({
+            id: "dialogs.clear_view_history_confirm",
+          })}
+          confirmButtonText={intl.formatMessage({ id: "actions.clear" })}
+          onConfirm={() => handleClearViewDates()}
+          onCancel={() => setDialogPartial({ viewHistory: false })}
+        />
+        <AlertModal
           show={dialogs.oHistory}
           text={intl.formatMessage({ id: clearHistoryMessageID })}
           confirmButtonText={intl.formatMessage({ id: "actions.clear" })}
@@ -349,6 +393,18 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
             }}
           />
         )}
+        {dialogs.addView && (
+          <DatePickerModal
+            show
+            onClose={(t) => {
+              const tt = t ? dateStringToISOString(t) : null;
+              if (tt) {
+                handleAddViewDate(tt);
+              }
+              setDialogPartial({ addView: false });
+            }}
+          />
+        )}
       </>
     );
   }
@@ -357,6 +413,9 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
     (h) => h != null
   ) as string[];
   const oHistory = (scene.o_history ?? []).filter((h) => h != null) as string[];
+  const viewHistory = (scene.view_history ?? []).filter(
+    (h) => h != null
+  ) as string[];
 
   const oHistoryMessageID = sfwContentMode ? "o_history_sfw" : "o_history";
   const noneMessageID = sfwContentMode
@@ -442,6 +501,44 @@ export const SceneHistoryPanel: React.FC<ISceneHistoryProps> = ({ scene }) => {
           noneID={noneMessageID}
           unknownDate={scene.created_at}
           onRemove={(t) => handleDeleteODate(t)}
+        />
+      </div>
+
+      {/* views are recorded by our own events - opening the scene, dwelling on
+          a card, the mark-viewed button - and never affect play duration */}
+      <div className="view-history">
+        <div className="history-header">
+          <h5>
+            <span>
+              <FormattedMessage id="view_history" />
+              <Counter count={viewHistory.length} hideZero />
+            </span>
+            <span>
+              <Button
+                size="sm"
+                variant="minimal"
+                className="add-date-button"
+                title={intl.formatMessage({ id: "actions.add_view" })}
+                onClick={() => handleAddViewDate()}
+              >
+                <Icon icon={faPlus} />
+              </Button>
+              <HistoryMenu
+                hasHistory={viewHistory.length > 0}
+                showResetResumeDuration={false}
+                onAddDate={() => setDialogPartial({ addView: true })}
+                onClearDates={() => setDialogPartial({ viewHistory: true })}
+                resetResume={() => handleResetResume()}
+                resetDuration={() => handleResetDuration()}
+              />
+            </span>
+          </h5>
+        </div>
+        <History
+          history={viewHistory}
+          noneID="viewdate_recorded_no"
+          unknownDate={scene.created_at}
+          onRemove={(t) => handleDeleteViewDate(t)}
         />
       </div>
     </div>

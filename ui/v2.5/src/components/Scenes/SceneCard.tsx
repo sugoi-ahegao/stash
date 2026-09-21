@@ -39,12 +39,12 @@ import { FileSize } from "../Shared/FileSize";
 import { OCounterButton } from "../Shared/CountButton";
 import { defaultPreviewVolume } from "src/core/config";
 import { goldenActivationDelay, isGolden } from "src/core/golden";
-import { hoverPlayDelay } from "src/core/hoverPlay";
+import { hoverViewDelay } from "src/core/hoverView";
 import { SceneFire } from "./SceneFire";
 import { View } from "../List/views";
-import { useSceneIncrementPlayCount } from "src/core/StashService";
+import { useSceneAddView } from "src/core/StashService";
 import { useToast } from "src/hooks/Toast";
-import { playedToday } from "src/core/played";
+import { viewedToday } from "src/core/viewed";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -150,28 +150,29 @@ const Description: React.FC<{
   );
 };
 
-// One-click "I watched this" for the card grid: stamps a play at the current
-// time, exactly as the scene page's play count button does. Sits with the
-// count buttons at the foot of the card.
+// One-click "I've seen this" for the card grid: stamps a VIEW at the current
+// time. Sits with the count buttons at the foot of the card.
 //
-// It lights up while the scene's last play falls on today, which needs no
-// local state: the mutation writes last_played_at into the cache, so the
+// A view is not a play - it never touches play count or play duration.
+//
+// It lights up while the scene's last view falls on today, which needs no
+// local state: the mutation writes last_viewed_at into the cache, so the
 // button reads its own result back and stays lit until midnight.
-const MarkPlayedButton: React.FC<{
+const MarkViewedButton: React.FC<{
   sceneID: string;
-  lastPlayedAt?: string | null;
+  lastViewedAt?: string | null;
   disabled?: boolean;
 }> = PatchComponent(
-  "SceneCard.MarkPlayedButton",
-  ({ sceneID, lastPlayedAt, disabled }) => {
+  "SceneCard.MarkViewedButton",
+  ({ sceneID, lastViewedAt, disabled }) => {
     const intl = useIntl();
     const Toast = useToast();
 
     // no list eviction - refetching the list would replace the grid with a
-    // spinner and drop the card being clicked. See useSceneIncrementPlayCount.
-    const [incrementPlay] = useSceneIncrementPlayCount(false);
+    // spinner and drop the card being clicked. See useSceneAddView.
+    const [addView] = useSceneAddView();
 
-    const playedTodayNow = playedToday(lastPlayedAt);
+    const viewedTodayNow = viewedToday(lastViewedAt);
 
     async function onClick(event: React.MouseEvent) {
       // the card behind the button navigates and selects
@@ -181,7 +182,7 @@ const MarkPlayedButton: React.FC<{
       if (disabled) return;
 
       try {
-        await incrementPlay({ variables: { id: sceneID } });
+        await addView({ variables: { id: sceneID } });
       } catch (e) {
         Toast.error(e);
       }
@@ -190,10 +191,10 @@ const MarkPlayedButton: React.FC<{
     return (
       <Button
         variant="secondary"
-        className={cx("minimal", "mark-played-button", {
-          "played-today": playedTodayNow,
+        className={cx("minimal", "mark-viewed-button", {
+          "viewed-today": viewedTodayNow,
         })}
-        title={intl.formatMessage({ id: "actions.add_play" })}
+        title={intl.formatMessage({ id: "actions.add_view" })}
         onClick={onClick}
       >
         <Icon icon={faEye} />
@@ -339,11 +340,11 @@ const SceneCardPopovers = React.memo(
       }
     }
 
-    function renderMarkPlayed() {
+    function renderMarkViewed() {
       return (
-        <MarkPlayedButton
+        <MarkViewedButton
           sceneID={props.scene.id}
-          lastPlayedAt={props.scene.last_played_at}
+          lastViewedAt={props.scene.last_viewed_at}
           disabled={props.selecting}
         />
       );
@@ -386,7 +387,7 @@ const SceneCardPopovers = React.memo(
               {maybeRenderGallery()}
               {maybeRenderOrganized()}
               {maybeRenderDupeCopies()}
-              {renderMarkPlayed()}
+              {renderMarkViewed()}
             </ButtonGroup>
           </>
         );
@@ -554,17 +555,17 @@ export const SceneCard = React.memo(
     const [awake, setAwake] = useState(false);
     const wakeTimer = useRef<ReturnType<typeof setTimeout>>();
 
-    // On the landing page, dwelling on a card counts as a play - the same
-    // thing opening the scene page does. Counted once per card: leaving and
-    // coming back to the same card doesn't play it again.
-    const hoverPlays =
+    // On the landing page, dwelling on a card records a view - the same thing
+    // opening the scene page does. Counted once per card: leaving and coming
+    // back to the same card doesn't view it again.
+    const hoverViews =
       props.view === View.Landing && configuration?.ui?.trackActivity !== false;
 
     // no list eviction: refetching the scene list would replace the grid with
     // a spinner and drop the card the cursor is sitting on.
-    const [incrementPlay] = useSceneIncrementPlayCount(false);
-    const playTimer = useRef<ReturnType<typeof setTimeout>>();
-    const played = useRef(false);
+    const [addView] = useSceneAddView();
+    const viewTimer = useRef<ReturnType<typeof setTimeout>>();
+    const viewed = useRef(false);
 
     const onMouseEnter = useCallback(() => {
       if (golden && !awake) {
@@ -574,23 +575,23 @@ export const SceneCard = React.memo(
         );
       }
 
-      if (hoverPlays && !played.current) {
-        playTimer.current = setTimeout(() => {
-          played.current = true;
-          incrementPlay({ variables: { id: props.scene.id } });
-        }, hoverPlayDelay);
+      if (hoverViews && !viewed.current) {
+        viewTimer.current = setTimeout(() => {
+          viewed.current = true;
+          addView({ variables: { id: props.scene.id } });
+        }, hoverViewDelay);
       }
-    }, [golden, awake, hoverPlays, incrementPlay, props.scene.id]);
+    }, [golden, awake, hoverViews, addView, props.scene.id]);
 
     const onMouseLeave = useCallback(() => {
       clearTimeout(wakeTimer.current);
-      clearTimeout(playTimer.current);
+      clearTimeout(viewTimer.current);
     }, []);
 
     useEffect(
       () => () => {
         clearTimeout(wakeTimer.current);
-        clearTimeout(playTimer.current);
+        clearTimeout(viewTimer.current);
       },
       []
     );
@@ -631,8 +632,8 @@ export const SceneCard = React.memo(
         selected={props.selected}
         selecting={props.selecting}
         onSelectedChanged={props.onSelectedChanged}
-        onMouseEnter={golden || hoverPlays ? onMouseEnter : undefined}
-        onMouseLeave={golden || hoverPlays ? onMouseLeave : undefined}
+        onMouseEnter={golden || hoverViews ? onMouseEnter : undefined}
+        onMouseLeave={golden || hoverViews ? onMouseLeave : undefined}
         decorations={golden ? <SceneFire /> : undefined}
       />
     );

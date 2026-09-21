@@ -1039,6 +1039,98 @@ export const useSceneIncrementPlayCount = (evictLists = true) =>
     },
   });
 
+// View history is recorded from our own events - opening a scene, dwelling on a card,
+// the mark-viewed button - and never touches play count or play duration. `evictLists`
+// is off by default here because most callers record a view from inside a visible list,
+// where a refetch would pull the grid out from under the cursor.
+export const useSceneAddView = (evictLists = false) =>
+  GQL.useSceneAddViewMutation({
+    update(cache, result, { variables }) {
+      const mutationResult = result.data?.sceneAddView;
+
+      if (!mutationResult || !variables) return;
+
+      const { history } = mutationResult;
+      const { id } = variables;
+
+      cache.modify({
+        id: cache.identify({ __typename: "Scene", id }),
+        fields: {
+          view_count() {
+            return history.length;
+          },
+          last_viewed_at() {
+            // the first entry is the most recent
+            return history[0];
+          },
+          view_history() {
+            return history;
+          },
+        },
+      });
+
+      if (evictLists) {
+        evictQueries(cache, [
+          GQL.FindScenesDocument, // filter by view count
+        ]);
+      }
+    },
+  });
+
+export const useSceneDeleteView = () =>
+  GQL.useSceneDeleteViewMutation({
+    update(cache, result, { variables }) {
+      const mutationResult = result.data?.sceneDeleteView;
+
+      if (!mutationResult || !variables) return;
+
+      const { history } = mutationResult;
+      const { id } = variables;
+
+      cache.modify({
+        id: cache.identify({ __typename: "Scene", id }),
+        fields: {
+          view_count() {
+            return history.length;
+          },
+          last_viewed_at() {
+            return history[0] ?? null;
+          },
+          view_history() {
+            return history;
+          },
+        },
+      });
+
+      evictQueries(cache, [GQL.FindScenesDocument]);
+    },
+  });
+
+export const useSceneResetViewCount = () =>
+  GQL.useSceneResetViewCountMutation({
+    update(cache, _result, { variables }) {
+      if (!variables) return;
+
+      cache.modify({
+        id: cache.identify({ __typename: "Scene", id: variables.id }),
+        fields: {
+          view_count() {
+            return 0;
+          },
+          view_history() {
+            const ret: string[] = [];
+            return ret;
+          },
+          last_viewed_at() {
+            return null;
+          },
+        },
+      });
+
+      evictQueries(cache, [GQL.FindScenesDocument]);
+    },
+  });
+
 export const useSceneDecrementPlayCount = () =>
   GQL.useSceneDeletePlayMutation({
     update(cache, result, { variables }) {

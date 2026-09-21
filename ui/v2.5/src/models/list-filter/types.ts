@@ -190,6 +190,8 @@ export type CriterionType =
   | "play_count"
   | "play_duration"
   | "last_played_at"
+  | "view_count"
+  | "last_viewed_at"
   | "name"
   | "details"
   | "title"

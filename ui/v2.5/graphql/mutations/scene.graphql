@@ -64,6 +64,24 @@ mutation SceneResetPlayCount($id: ID!) {
   sceneResetPlayCount(id: $id)
 }
 
+mutation SceneAddView($id: ID!, $times: [Timestamp!]) {
+  sceneAddView(id: $id, times: $times) {
+    count
+    history
+  }
+}
+
+mutation SceneDeleteView($id: ID!, $times: [Timestamp!]) {
+  sceneDeleteView(id: $id, times: $times) {
+    count
+    history
+  }
+}
+
+mutation SceneResetViewCount($id: ID!) {
+  sceneResetViewCount(id: $id)
+}
+
 mutation SceneAddO($id: ID!, $times: [Timestamp!]) {
   sceneAddO(id: $id, times: $times) {
     count

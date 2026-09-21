@@ -28,6 +28,7 @@ import "./wake-sentinel";
 import cx from "classnames";
 import {
   useSceneSaveActivity,
+  useSceneIncrementPlayCount,
   useConfigureInterface,
 } from "src/core/StashService";
 
@@ -249,6 +250,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
     const [_player, setPlayer] = useState<VideoJsPlayer>();
     const sceneId = useRef<string>();
     const [sceneSaveActivity] = useSceneSaveActivity();
+    const [sceneIncrementPlayCount] = useSceneIncrementPlayCount();
     const [updateInterfaceConfig] = useConfigureInterface();
 
     const [time, setTime] = useState(0);
@@ -847,11 +849,19 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
         });
       }
 
+      async function incrementPlayCount() {
+        if (!scene.id) return;
+
+        await sceneIncrementPlayCount({
+          variables: {
+            id: scene.id,
+          },
+        });
+      }
+
       const activity = player.trackActivity();
       activity.saveActivity = saveActivity;
-      // the play count is incremented when the scene page is opened, so the
-      // player only tracks play duration and resume time.
-      activity.incrementPlayCount = () => Promise.resolve();
+      activity.incrementPlayCount = incrementPlayCount;
       activity.minimumPlayPercent = minimumPlayPercent;
       activity.setEnabled(trackActivity);
     }, [
@@ -859,6 +869,7 @@ export const ScenePlayer: React.FC<IScenePlayerProps> = PatchComponent(
       scene,
       trackActivity,
       minimumPlayPercent,
+      sceneIncrementPlayCount,
       sceneSaveActivity,
     ]);
 

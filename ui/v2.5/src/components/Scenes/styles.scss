@@ -205,7 +205,7 @@ textarea.scene-description {
 // group, so bootstrap's `.btn-group > .btn { flex: 1 1 auto }` catches only
 // this one, and stretches it across the row with its icon stranded in the
 // middle. Overriding that needs to outweigh two classes, hence .btn here.
-.card-popovers .btn.mark-played-button {
+.card-popovers .btn.mark-viewed-button {
   flex: 0 0 auto;
   transition: color 0.2s ease;
 
@@ -216,7 +216,7 @@ textarea.scene-description {
   }
 
   // lit while the scene's last play falls on today
-  &.played-today {
+  &.viewed-today {
     color: #5cb85c;
   }
 }
@@ -891,7 +891,8 @@ input[type="range"].blue-slider {
 }
 
 .play-history,
-.o-history {
+.o-history,
+.view-history {
   .history-header h5 {
     align-items: center;
     display: flex;
