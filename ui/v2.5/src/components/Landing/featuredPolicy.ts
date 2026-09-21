@@ -21,7 +21,7 @@ export const MAX_UNLOCKS_PER_DAY = 3;
 // faster. Together with MAX_UNLOCKS_PER_DAY this sets the carousel's
 // steady-state size: roughly MAX_UNLOCKS_PER_DAY * UNLOCKED_VISIBLE_DAYS
 // unlocked slides, plus whatever is left of today's unlock budget.
-export const UNLOCKED_VISIBLE_DAYS = 3;
+export const UNLOCKED_VISIBLE_DAYS = 2;
 
 // how long an unlocked-but-still-unrated scene stays in the featured group,
 // in days. This one MUTATES: the sweep drops the scene from the group and
