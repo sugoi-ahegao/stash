@@ -16,6 +16,7 @@ import { DeleteScenesDialog } from "./DeleteScenesDialog";
 import { GenerateDialog } from "../Dialogs/GenerateDialog";
 import { ExportDialog } from "../Shared/ExportDialog";
 import { SceneCardGrid } from "./SceneCardGrid";
+import { SceneCollectionPanel } from "./SceneCollectionPanel";
 import { TaggerContext } from "../Tagger/context";
 import { IdentifyDialog } from "../Dialogs/IdentifyDialog/IdentifyDialog";
 import { useConfigurationContext } from "src/hooks/Config";
@@ -194,7 +195,13 @@ const SceneList: React.FC<{
       [filter]
     );
 
-    if (scenes.length === 0 && filter.displayMode !== DisplayMode.Tagger) {
+    // Collections renders folder rows rather than the page of scenes it is handed, so an
+    // empty page must not blank it out
+    if (
+      scenes.length === 0 &&
+      filter.displayMode !== DisplayMode.Tagger &&
+      filter.displayMode !== DisplayMode.Collections
+    ) {
       return null;
     }
 
@@ -241,6 +248,9 @@ const SceneList: React.FC<{
           onSelectChange={onSelectChange}
         />
       );
+    }
+    if (filter.displayMode === DisplayMode.Collections) {
+      return <SceneCollectionPanel filter={filter} view={view} />;
     }
 
     return null;
@@ -357,6 +367,7 @@ const SidebarContent: React.FC<{
 interface IFilteredScenes {
   filterHook?: (filter: ListFilterModel) => ListFilterModel;
   defaultSort?: string;
+  defaultDisplayMode?: DisplayMode;
   view?: View;
   alterQuery?: boolean;
   fromGroupId?: string;
@@ -371,7 +382,14 @@ export const FilteredSceneList = PatchComponent(
 
     const searchFocus = useFocus();
 
-    const { filterHook, defaultSort, view, alterQuery, fromGroupId } = props;
+    const {
+      filterHook,
+      defaultSort,
+      defaultDisplayMode,
+      view,
+      alterQuery,
+      fromGroupId,
+    } = props;
 
     // States
     const {
@@ -387,6 +405,7 @@ export const FilteredSceneList = PatchComponent(
         filterStateProps: {
           filterMode: GQL.FilterMode.Scenes,
           defaultSort,
+          defaultDisplayMode,
           view,
           useURL: alterQuery,
         },
@@ -694,21 +713,25 @@ export const FilteredSceneList = PatchComponent(
                   onRemoveAll={clearAllCriteria}
                 />
 
-                <div className="pagination-index-container">
-                  <Pagination
-                    currentPage={filter.currentPage}
-                    itemsPerPage={filter.itemsPerPage}
-                    totalItems={totalCount}
-                    onChangePage={(page) => setFilter(filter.changePage(page))}
-                  />
-                  <PaginationIndex
-                    loading={cachedResult.loading}
-                    itemsPerPage={filter.itemsPerPage}
-                    currentPage={filter.currentPage}
-                    totalItems={totalCount}
-                    metadataByline={metadataByline}
-                  />
-                </div>
+                {filter.displayMode !== DisplayMode.Collections && (
+                  <div className="pagination-index-container">
+                    <Pagination
+                      currentPage={filter.currentPage}
+                      itemsPerPage={filter.itemsPerPage}
+                      totalItems={totalCount}
+                      onChangePage={(page) =>
+                        setFilter(filter.changePage(page))
+                      }
+                    />
+                    <PaginationIndex
+                      loading={cachedResult.loading}
+                      itemsPerPage={filter.itemsPerPage}
+                      currentPage={filter.currentPage}
+                      totalItems={totalCount}
+                      metadataByline={metadataByline}
+                    />
+                  </div>
+                )}
 
                 <LoadedContent loading={result.loading} error={result.error}>
                   <SceneList
@@ -721,20 +744,21 @@ export const FilteredSceneList = PatchComponent(
                   />
                 </LoadedContent>
 
-                {totalCount > filter.itemsPerPage && (
-                  <div className="pagination-footer-container">
-                    <div className="pagination-footer">
-                      <Pagination
-                        itemsPerPage={filter.itemsPerPage}
-                        currentPage={filter.currentPage}
-                        totalItems={totalCount}
-                        metadataByline={metadataByline}
-                        onChangePage={setPage}
-                        pagePopupPlacement="top"
-                      />
+                {filter.displayMode !== DisplayMode.Collections &&
+                  totalCount > filter.itemsPerPage && (
+                    <div className="pagination-footer-container">
+                      <div className="pagination-footer">
+                        <Pagination
+                          itemsPerPage={filter.itemsPerPage}
+                          currentPage={filter.currentPage}
+                          totalItems={totalCount}
+                          metadataByline={metadataByline}
+                          onChangePage={setPage}
+                          pagePopupPlacement="top"
+                        />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </SidebarPaneContent>
             </SidebarPane>
           </SidebarStateContext.Provider>

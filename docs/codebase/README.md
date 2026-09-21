@@ -19,6 +19,7 @@ Read [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) first for build/run instructions
 | 07 | [This fork](07-this-fork.md) | You want to know what diverges from upstream `develop` on this branch |
 | 08 | [Frontend component map](08-frontend-components.md) | You want to know what components exist, how they nest, and where to add a new one |
 | 09 | [Parallel experiments](09-parallel-experiments.md) | You want several throwaway feature branches running against one shared library |
+| 10 | [Collections](10-collections.md) | You want to know how the Collections display mode groups scenes by their intake folder |
 
 Docs 05 and 08 are a pair: **05 is the frontend's frameworks** (list contexts, filter model,
 patching, config), **08 is its components** (page archetypes, cards, players, dialogs, and

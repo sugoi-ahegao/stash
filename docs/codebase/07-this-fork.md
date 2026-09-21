@@ -31,6 +31,14 @@ Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`,
   NEW  internal/api/scene_featured.go       featured group id + custom-field names,
                                            membership diffing, generate trigger
 
+  NEW  ui/v2.5/src/core/collections.ts            collection derivation rules (see doc 10)
+  NEW  ui/v2.5/src/components/Scenes/
+         SceneCollectionPanel.tsx                 the Collections display mode
+  MOD  ui/v2.5/graphql/queries/folder.graphql     + FindCollectionFolders
+  MOD  list-filter/{types,scenes,filter}.ts,      register the mode, thread
+       List/{util,ListViewOptions}.tsx,             defaultDisplayMode
+       Scenes/SceneList.tsx
+
   MOD  App.tsx, MainNavbar.tsx, List/views.ts    wire up the /landing route
   MOD  graphql/queries/scene.graphql             2 new queries
   MOD  internal/api/resolver_mutation_scene.go   run the featured lifecycle on every
@@ -482,6 +490,40 @@ visible as a scroll affordance. Anything at or above `100vh` will hide it again.
 
 ---
 
+## Feature 5 — Collections
+
+A **Collections** display mode for the scene list, alongside Grid / List / Wall / Tagger:
+one row of scene cards per intake folder — the top-level folders inside each library root's
+`New` directory. `/landing` opens in it.
+
+**[Doc 10](10-collections.md) is the full write-up** — read it before changing any of it.
+The short version:
+
+- A collection is **derived, not stored**: `<library root>/New/<name>`, one level deep. Its
+  name is often a date but just as often a pack name, and **nothing is assumed about it**.
+- A collection is a **name**, not a folder — the same name under two roots is one collection
+  holding both roots' scenes.
+- It needed **no backend change**. Roots come from `configuration.general.stashes`, one
+  folder query supplies the paths, and a collection's scenes are the *existing*
+  `FolderCriterion` with a computed value.
+- Because it is a display mode it composes with every filter: narrow the list and every row
+  narrows with it.
+
+⚠️ Unlike the other display modes, this one **ignores the page of scenes it is handed** and
+pages over folders instead. `SceneList.tsx` therefore exempts it from the `scenes.length === 0`
+early return and hides the outer scene pagination while it is active. If you touch either,
+keep both in step.
+
+⚠️ `collectionFilter` must set `depth: -1`; the criterion defaults it to `0`, which matches
+only files directly inside the collection folder. Measured here, one collection went from 16
+scenes to 6. It fails silently.
+
+This one does **not** break the "no GraphQL schema change and no migration" claim above: the
+only schema-adjacent edit is a new query *document* in `ui/v2.5/graphql/`, which is a client
+document, not server schema.
+
+---
+
 ## If you're taking this upstream
 
 Read the "Project norms" section of doc 06 first. Against Stash's stated design vision:
@@ -498,6 +540,12 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
   realistic path rather than a rewrite. The exception is now the server-side lifecycle:
   a hardcoded group ID living in `internal/api` is not upstreamable as-is, and the
   plugin-API route would put that logic behind a `SceneUpdatePost` hook instead.
+- **Feature 5 (collections)** is library-specific by construction — it assumes a foldering
+  convention upstream has no reason to assume — so it belongs in a plugin, and it is already
+  shaped like one: no schema, no Go, an existing criterion, and all its rules in one pure
+  module. The awkward part for a plugin is the display mode itself: `DisplayMode` is a core
+  enum, so a plugin would patch `SceneList` rather than add a mode. `IUIConfig` would hold
+  the intake folder name.
 - **Feature 4 (play on open)** is a behaviour change to an existing metric, not an
   addition, and upstream deliberately gates plays on `minimumPlayPercent`. Expect it to
   be rejected as a default. It's viable upstream only as an opt-in config setting that

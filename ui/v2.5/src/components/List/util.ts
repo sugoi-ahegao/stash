@@ -122,16 +122,18 @@ export function useDefaultFilter(emptyFilter: ListFilterModel, view?: View) {
 function useEmptyFilter(props: {
   filterMode: GQL.FilterMode;
   defaultSort?: string;
+  defaultDisplayMode?: DisplayMode;
   config?: GQL.ConfigDataFragment;
 }) {
-  const { filterMode, defaultSort, config } = props;
+  const { filterMode, defaultSort, defaultDisplayMode, config } = props;
 
   const emptyFilter = useMemo(
     () =>
       new ListFilterModel(filterMode, config, {
         defaultSortBy: defaultSort,
+        defaultDisplayMode,
       }),
-    [config, filterMode, defaultSort]
+    [config, filterMode, defaultSort, defaultDisplayMode]
   );
 
   return emptyFilter;
@@ -141,6 +143,7 @@ export interface IFilterStateHook {
   filterMode: GQL.FilterMode;
   defaultFilter?: ListFilterModel;
   defaultSort?: string;
+  defaultDisplayMode?: DisplayMode;
   view?: View;
   useURL?: boolean;
 }
@@ -153,6 +156,7 @@ export function useFilterState(
   const {
     filterMode,
     defaultSort,
+    defaultDisplayMode,
     config,
     view,
     useURL,
@@ -161,10 +165,18 @@ export function useFilterState(
 
   const [filter, setFilterState] = useState<ListFilterModel>(
     () =>
-      new ListFilterModel(filterMode, config, { defaultSortBy: defaultSort })
+      new ListFilterModel(filterMode, config, {
+        defaultSortBy: defaultSort,
+        defaultDisplayMode,
+      })
   );
 
-  const emptyFilter = useEmptyFilter({ filterMode, defaultSort, config });
+  const emptyFilter = useEmptyFilter({
+    filterMode,
+    defaultSort,
+    defaultDisplayMode,
+    config,
+  });
 
   const { defaultFilter: defaultFilterFromConfig } = useDefaultFilter(
     emptyFilter,

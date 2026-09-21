@@ -5,11 +5,16 @@ import { SceneQueue } from "src/models/sceneQueue";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import { PatchComponent } from "src/patch";
 import { FilteredRecommendationRow } from "../FrontPage/FilteredRecommendationRow";
+import { View } from "../List/views";
 
 interface IProps {
   isTouch: boolean;
   filter: ListFilterModel;
   header: string;
+  // the list these rows stand in for, when they are standing in for one. The
+  // front page's rows belong to no list and leave it unset - it is what tells
+  // a card it is on the landing page, where dwelling on it records a view.
+  view?: View;
 }
 
 export const SceneRecommendationRow: React.FC<IProps> = PatchComponent(
@@ -43,6 +48,7 @@ export const SceneRecommendationRow: React.FC<IProps> = PatchComponent(
                 queue={queue}
                 index={index}
                 zoomIndex={1}
+                view={props.view}
               />
             ))}
       </FilteredRecommendationRow>

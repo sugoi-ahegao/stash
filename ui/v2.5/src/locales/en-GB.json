@@ -1125,6 +1125,7 @@
   "director": "Director",
   "disambiguation": "Disambiguation",
   "display_mode": {
+    "collections": "Collections",
     "grid": "Grid",
     "label_current": "Display Mode: {current}",
     "list": "List",

@@ -148,3 +148,21 @@ query FindScenesForSelect(
     }
   }
 }
+
+# Minimal projection used to rank collections by their scenes' timestamps. Only the
+# parent folder is needed to attribute a scene to a collection - see src/core/collections.ts.
+query FindCollectionSceneStats($scene_filter: SceneFilterType) {
+  findScenes(filter: { per_page: -1 }, scene_filter: $scene_filter) {
+    count
+    scenes {
+      id
+      updated_at
+      last_played_at
+      files {
+        parent_folder {
+          id
+        }
+      }
+    }
+  }
+}
