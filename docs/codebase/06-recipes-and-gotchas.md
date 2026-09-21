@@ -39,9 +39,9 @@ The canonical change. Say we're adding `my_field` (a nullable string).
 
 ```
  ┌─ 1. DATABASE ──────────────────────────────────────────────────────────────┐
- │  pkg/sqlite/migrations/86_scene_my_field.up.sql                            │
+ │  pkg/sqlite/migrations/186_scene_my_field.up.sql                           │
  │      ALTER TABLE scenes ADD COLUMN my_field VARCHAR;                       │
- │  pkg/sqlite/database.go       appSchemaVersion = 86                        │
+ │  pkg/sqlite/database.go       appSchemaVersion = 186                       │
  └────────────────────────────────────────────────────────────────────────────┘
  ┌─ 2. GO MODEL ──────────────────────────────────────────────────────────────┐
  │  pkg/models/model_scene.go                                                 │

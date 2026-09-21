@@ -37,7 +37,13 @@ lock error and let `txn` retry logic handle it over silently stalling.
 
 ## Schema shape
 
-Current version: **`appSchemaVersion = 85`** (`pkg/sqlite/database.go:37`).
+Current version: **`appSchemaVersion = 185`** (`pkg/sqlite/database.go:37`).
+
+⚠️ **This fork numbers its own migrations from 185 up.** Upstream stash is at 85, so the
+fork's migrations start at 185 to leave room for upstream to keep going without colliding
+with ours — a database migrated by this fork is immediately recognisable by its version
+number. Migration versions are therefore **not contiguous**: 85 is followed by 185. See
+*The per-version cycle* below for what that means for the migrator.
 
 ### Core entity tables
 
@@ -153,7 +159,8 @@ validation error, not a silent precedence rule.
     ├── 71_custom_fields.up.sql
     ├── 83_image_custom_fields.up.sql
     ├── 84_folder_basename.up.sql
-    └── 85_performer_career_dates.up.sql
+    ├── 85_performer_career_dates.up.sql   ← last upstream migration
+    └── 185_scene_view_history.up.sql      ← first fork migration (note the jump)
 ```
 
 Files are embedded with `//go:embed migrations/*.sql` and executed by
@@ -162,7 +169,7 @@ Files are embedded with `//go:embed migrations/*.sql` and executed by
 ### The per-version cycle
 
 ```
-  for v := currentVersion+1 ; v <= appSchemaVersion ; v++ {
+  for v := nextAvailableVersion(current) ; v != 0 ; v = nextAvailableVersion(v) {
 
         ┌── premigrate  (optional Go)   e.g. read data that the SQL is about to destroy
         │
@@ -171,6 +178,13 @@ Files are embedded with `//go:embed migrations/*.sql` and executed by
         └── postmigrate (optional Go)  e.g. backfill new columns from data captured above
   }
 ```
+
+The loop walks the versions that actually exist on disk rather than counting up by one —
+`Migrator.NextSchemaVersion` / `RemainingSchemaVersions` ask the `golang-migrate` source
+driver for the next version after the current one. That is what lets 85 jump straight to
+185. `RunMigration` validates its argument against the next *available* version, and
+`StepsRequired` (the progress total in the migrate UI) counts remaining migrations, not
+the difference between version numbers.
 
 Pre/post migration Go exists because some transformations are impossible in SQLite SQL —
 particularly anything requiring hashing, filesystem access, or parsing.
@@ -188,9 +202,9 @@ is: create `<table>_new`, copy data across, drop the old, rename. Look at
 ### Adding a migration
 
 ```
- 1. Create pkg/sqlite/migrations/86_my_change.up.sql
- 2. Bump  appSchemaVersion = 86   in pkg/sqlite/database.go:37
- 3. (optional) 86_premigrate.go / 86_postmigrate.go  — follow the shape of 32_*.go
+ 1. Create pkg/sqlite/migrations/186_my_change.up.sql   ← fork numbering: 185 and up
+ 2. Bump  appSchemaVersion = 186   in pkg/sqlite/database.go:37
+ 3. (optional) 186_premigrate.go / 186_postmigrate.go  — follow the shape of 32_*.go
  4. Update the affected store in pkg/sqlite/<entity>.go (columns list, scan targets)
  5. Update pkg/models/model_<entity>.go and the *Partial struct
  6. Update graphql/schema/types/<entity>.graphql, then `make generate-backend`

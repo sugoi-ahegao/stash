@@ -140,7 +140,7 @@ func (s *MigrateJob) required() (ret databaseSchemaInfo, err error) {
 		return
 	}
 
-	ret.StepsRequired = ret.RequiredSchemaVersion - ret.CurrentSchemaVersion
+	ret.StepsRequired = uint(len(m.RemainingSchemaVersions()))
 	return
 }
 
@@ -164,13 +164,19 @@ func (s *MigrateJob) runMigrations(ctx context.Context, progress *job.Progress) 
 			break
 		}
 
+		// migration versions are not necessarily contiguous
+		nextSchemaVersion := m.NextSchemaVersion()
+		if nextSchemaVersion == 0 {
+			break
+		}
+
 		var err error
-		progress.ExecuteTask(fmt.Sprintf("Migrating database to schema version %d", currentSchemaVersion+1), func() {
-			err = m.RunMigration(ctx, currentSchemaVersion+1)
+		progress.ExecuteTask(fmt.Sprintf("Migrating database to schema version %d", nextSchemaVersion), func() {
+			err = m.RunMigration(ctx, nextSchemaVersion)
 		})
 
 		if err != nil {
-			return fmt.Errorf("error running migration for schema %d: %s", currentSchemaVersion+1, err)
+			return fmt.Errorf("error running migration for schema %d: %s", nextSchemaVersion, err)
 		}
 
 		progress.Increment()
