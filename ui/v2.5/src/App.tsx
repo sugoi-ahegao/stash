@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useState } from "react";
 import {
+  Redirect,
   Route,
   Switch,
   useHistory,
@@ -253,8 +254,9 @@ export const App: React.FC = () => {
       <ErrorBoundary>
         <Suspense fallback={<LoadingIndicator />}>
           <Switch>
-            <Route exact path="/" component={FrontPage} />
+            <Redirect exact from="/" to="/landing" />
             <Route path="/landing" component={Landing} />
+            <Route path="/home" component={FrontPage} />
             <Route path="/scenes" component={Scenes} />
             <Route path="/images" component={Images} />
             <Route path="/galleries" component={Galleries} />
