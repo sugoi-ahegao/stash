@@ -351,6 +351,10 @@ input SceneFilterType {
   play_duration: IntCriterionInput
   "Filter by scene last played time"
   last_played_at: TimestampCriterionInput
+  "Filter by view count"
+  view_count: IntCriterionInput
+  "Filter by scene last viewed time"
+  last_viewed_at: TimestampCriterionInput
   "Filter by date"
   date: DateCriterionInput
   "Filter by creation time"

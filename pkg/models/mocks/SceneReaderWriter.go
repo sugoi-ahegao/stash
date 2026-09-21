@@ -67,6 +67,29 @@ func (_m *SceneReaderWriter) AddO(ctx context.Context, id int, dates []time.Time
 	return r0, r1
 }
 
+// AddViewed provides a mock function with given fields: ctx, sceneID, dates
+func (_m *SceneReaderWriter) AddViewed(ctx context.Context, sceneID int, dates []time.Time) ([]time.Time, error) {
+	ret := _m.Called(ctx, sceneID, dates)
+
+	var r0 []time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, int, []time.Time) []time.Time); ok {
+		r0 = rf(ctx, sceneID, dates)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int, []time.Time) error); ok {
+		r1 = rf(ctx, sceneID, dates)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AddViews provides a mock function with given fields: ctx, sceneID, dates
 func (_m *SceneReaderWriter) AddViews(ctx context.Context, sceneID int, dates []time.Time) ([]time.Time, error) {
 	ret := _m.Called(ctx, sceneID, dates)
@@ -129,6 +152,27 @@ func (_m *SceneReaderWriter) AssignFiles(ctx context.Context, sceneID int, fileI
 
 // Count provides a mock function with given fields: ctx
 func (_m *SceneReaderWriter) Count(ctx context.Context) (int, error) {
+	ret := _m.Called(ctx)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context) int); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountAllViewed provides a mock function with given fields: ctx
+func (_m *SceneReaderWriter) CountAllViewed(ctx context.Context) (int, error) {
 	ret := _m.Called(ctx)
 
 	var r0 int
@@ -253,6 +297,27 @@ func (_m *SceneReaderWriter) CountMissingOSHash(ctx context.Context) (int, error
 	return r0, r1
 }
 
+// CountUniqueViewed provides a mock function with given fields: ctx
+func (_m *SceneReaderWriter) CountUniqueViewed(ctx context.Context) (int, error) {
+	ret := _m.Called(ctx)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context) int); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CountUniqueViews provides a mock function with given fields: ctx
 func (_m *SceneReaderWriter) CountUniqueViews(ctx context.Context) (int, error) {
 	ret := _m.Called(ctx)
@@ -267,6 +332,27 @@ func (_m *SceneReaderWriter) CountUniqueViews(ctx context.Context) (int, error) 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
 		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountViewed provides a mock function with given fields: ctx, id
+func (_m *SceneReaderWriter) CountViewed(ctx context.Context, id int) (int, error) {
+	ret := _m.Called(ctx, id)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context, int) int); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -309,6 +395,27 @@ func (_m *SceneReaderWriter) Create(ctx context.Context, newScene *models.Scene,
 	return r0
 }
 
+// DeleteAllViewed provides a mock function with given fields: ctx, id
+func (_m *SceneReaderWriter) DeleteAllViewed(ctx context.Context, id int) (int, error) {
+	ret := _m.Called(ctx, id)
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func(context.Context, int) int); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // DeleteAllViews provides a mock function with given fields: ctx, id
 func (_m *SceneReaderWriter) DeleteAllViews(ctx context.Context, id int) (int, error) {
 	ret := _m.Called(ctx, id)
@@ -332,6 +439,29 @@ func (_m *SceneReaderWriter) DeleteAllViews(ctx context.Context, id int) (int, e
 
 // DeleteO provides a mock function with given fields: ctx, id, dates
 func (_m *SceneReaderWriter) DeleteO(ctx context.Context, id int, dates []time.Time) ([]time.Time, error) {
+	ret := _m.Called(ctx, id, dates)
+
+	var r0 []time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, int, []time.Time) []time.Time); ok {
+		r0 = rf(ctx, id, dates)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int, []time.Time) error); ok {
+		r1 = rf(ctx, id, dates)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DeleteViewed provides a mock function with given fields: ctx, id, dates
+func (_m *SceneReaderWriter) DeleteViewed(ctx context.Context, id int, dates []time.Time) ([]time.Time, error) {
 	ret := _m.Called(ctx, id, dates)
 
 	var r0 []time.Time
@@ -938,6 +1068,29 @@ func (_m *SceneReaderWriter) GetManyLastViewed(ctx context.Context, ids []int) (
 	return r0, r1
 }
 
+// GetManyLastViewedAt provides a mock function with given fields: ctx, ids
+func (_m *SceneReaderWriter) GetManyLastViewedAt(ctx context.Context, ids []int) ([]*time.Time, error) {
+	ret := _m.Called(ctx, ids)
+
+	var r0 []*time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, []int) []*time.Time); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []int) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetManyOCount provides a mock function with given fields: ctx, ids
 func (_m *SceneReaderWriter) GetManyOCount(ctx context.Context, ids []int) ([]int, error) {
 	ret := _m.Called(ctx, ids)
@@ -1009,6 +1162,52 @@ func (_m *SceneReaderWriter) GetManyViewCount(ctx context.Context, ids []int) ([
 
 // GetManyViewDates provides a mock function with given fields: ctx, ids
 func (_m *SceneReaderWriter) GetManyViewDates(ctx context.Context, ids []int) ([][]time.Time, error) {
+	ret := _m.Called(ctx, ids)
+
+	var r0 [][]time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, []int) [][]time.Time); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([][]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []int) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManyViewedCount provides a mock function with given fields: ctx, ids
+func (_m *SceneReaderWriter) GetManyViewedCount(ctx context.Context, ids []int) ([]int, error) {
+	ret := _m.Called(ctx, ids)
+
+	var r0 []int
+	if rf, ok := ret.Get(0).(func(context.Context, []int) []int); ok {
+		r0 = rf(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, []int) error); ok {
+		r1 = rf(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetManyViewedDates provides a mock function with given fields: ctx, ids
+func (_m *SceneReaderWriter) GetManyViewedDates(ctx context.Context, ids []int) ([][]time.Time, error) {
 	ret := _m.Called(ctx, ids)
 
 	var r0 [][]time.Time
@@ -1168,6 +1367,29 @@ func (_m *SceneReaderWriter) GetURLs(ctx context.Context, relatedID int) ([]stri
 
 // GetViewDates provides a mock function with given fields: ctx, relatedID
 func (_m *SceneReaderWriter) GetViewDates(ctx context.Context, relatedID int) ([]time.Time, error) {
+	ret := _m.Called(ctx, relatedID)
+
+	var r0 []time.Time
+	if rf, ok := ret.Get(0).(func(context.Context, int) []time.Time); ok {
+		r0 = rf(ctx, relatedID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]time.Time)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = rf(ctx, relatedID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetViewedDates provides a mock function with given fields: ctx, relatedID
+func (_m *SceneReaderWriter) GetViewedDates(ctx context.Context, relatedID int) ([]time.Time, error) {
 	ret := _m.Called(ctx, relatedID)
 
 	var r0 []time.Time

@@ -16,6 +16,7 @@ import (
 
 type ExportGetter interface {
 	models.ViewDateReader
+	models.ViewedDateReader
 	models.ODateReader
 	models.CustomFieldsReader
 	GetCover(ctx context.Context, sceneID int) ([]byte, error)
@@ -91,6 +92,15 @@ func ToBasicJSON(ctx context.Context, reader ExportGetter, scene *models.Scene) 
 
 	for _, date := range odates {
 		newSceneJSON.OHistory = append(newSceneJSON.OHistory, json.JSONTime{Time: date})
+	}
+
+	viewedDates, err := reader.GetViewedDates(ctx, scene.ID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting viewed dates: %v", err)
+	}
+
+	for _, date := range viewedDates {
+		newSceneJSON.ViewHistory = append(newSceneJSON.ViewHistory, json.JSONTime{Time: date})
 	}
 
 	newSceneJSON.CustomFields, err = reader.GetCustomFields(ctx, scene.ID)

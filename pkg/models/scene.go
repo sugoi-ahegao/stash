@@ -117,6 +117,10 @@ type SceneFilterType struct {
 	PlayDuration *IntCriterionInput `json:"play_duration"`
 	// Filter by last played at
 	LastPlayedAt *TimestampCriterionInput `json:"last_played_at"`
+	// Filter by view count
+	ViewCount *IntCriterionInput `json:"view_count"`
+	// Filter by last viewed at
+	LastViewedAt *TimestampCriterionInput `json:"last_viewed_at"`
 	// Filter by date
 	Date *DateCriterionInput `json:"date"`
 	// Filter by related galleries that meet this criteria

@@ -81,6 +81,18 @@ type ViewDateReader interface {
 	GetManyLastViewed(ctx context.Context, ids []int) ([]*time.Time, error)
 }
 
+// ViewedDateReader reads VIEW history - the scene being surfaced to the user. Separate
+// from ViewDateReader above, which despite its name reads PLAY history.
+type ViewedDateReader interface {
+	CountViewed(ctx context.Context, id int) (int, error)
+	CountAllViewed(ctx context.Context) (int, error)
+	CountUniqueViewed(ctx context.Context) (int, error)
+	GetManyViewedCount(ctx context.Context, ids []int) ([]int, error)
+	GetViewedDates(ctx context.Context, relatedID int) ([]time.Time, error)
+	GetManyViewedDates(ctx context.Context, ids []int) ([][]time.Time, error)
+	GetManyLastViewedAt(ctx context.Context, ids []int) ([]*time.Time, error)
+}
+
 type ODateReader interface {
 	GetOCount(ctx context.Context, id int) (int, error)
 	GetManyOCount(ctx context.Context, ids []int) ([]int, error)
@@ -97,6 +109,7 @@ type SceneReader interface {
 
 	URLLoader
 	ViewDateReader
+	ViewedDateReader
 	ODateReader
 	FileIDLoader
 	GalleryIDLoader
@@ -128,6 +141,14 @@ type ViewHistoryWriter interface {
 	DeleteAllViews(ctx context.Context, id int) (int, error)
 }
 
+// ViewedHistoryWriter writes VIEW history. Separate from ViewHistoryWriter above, which
+// despite its name writes PLAY history.
+type ViewedHistoryWriter interface {
+	AddViewed(ctx context.Context, sceneID int, dates []time.Time) ([]time.Time, error)
+	DeleteViewed(ctx context.Context, id int, dates []time.Time) ([]time.Time, error)
+	DeleteAllViewed(ctx context.Context, id int) (int, error)
+}
+
 // SceneWriter provides all methods to modify scenes.
 type SceneWriter interface {
 	SceneCreator
@@ -140,6 +161,7 @@ type SceneWriter interface {
 
 	OHistoryWriter
 	ViewHistoryWriter
+	ViewedHistoryWriter
 	SaveActivity(ctx context.Context, sceneID int, resumeTime *float64, playDuration *float64) (bool, error)
 	ResetActivity(ctx context.Context, sceneID int, resetResume bool, resetDuration bool) (bool, error)
 	CustomFieldsWriter

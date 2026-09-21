@@ -20,6 +20,7 @@ type MergeOptions struct {
 	ScenePartial       models.ScenePartial
 	IncludePlayHistory bool
 	IncludeOHistory    bool
+	IncludeViewHistory bool
 }
 
 func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int, fileDeleter *FileDeleter, options MergeOptions) error {
@@ -93,6 +94,25 @@ func (s *Service) Merge(ctx context.Context, sourceIDs []int, destinationID int,
 		if len(allDates) > 0 {
 			if _, err := s.Repository.AddViews(ctx, destinationID, allDates); err != nil {
 				return fmt.Errorf("adding view dates to scene %d: %w", destinationID, err)
+			}
+		}
+	}
+
+	// merge view history
+	if options.IncludeViewHistory {
+		var allDates []time.Time
+		for _, src := range sources {
+			thisDates, err := s.Repository.GetViewedDates(ctx, src.ID)
+			if err != nil {
+				return fmt.Errorf("getting viewed dates for scene %d: %w", src.ID, err)
+			}
+
+			allDates = append(allDates, thisDates...)
+		}
+
+		if len(allDates) > 0 {
+			if _, err := s.Repository.AddViewed(ctx, destinationID, allDates); err != nil {
+				return fmt.Errorf("adding viewed dates to scene %d: %w", destinationID, err)
 			}
 		}
 	}

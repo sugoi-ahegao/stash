@@ -67,6 +67,13 @@ type Scene {
   play_history: [Time!]!
   "Times the o counter was incremented"
   o_history: [Time!]!
+  "Times a scene was viewed - surfaced to the user, as distinct from played"
+  view_history: [Time!]!
+
+  "The last time the scene was viewed"
+  last_viewed_at: Time
+  "The number of times a scene has been viewed"
+  view_count: Int
 
   files: [VideoFile!]!
   paths: ScenePathsType! # Resolver
@@ -290,6 +297,7 @@ input SceneMergeInput {
   # if true, the source history will be combined with the destination
   play_history: Boolean
   o_history: Boolean
+  view_history: Boolean
 }
 
 type HistoryMutationResult {

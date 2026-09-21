@@ -33,10 +33,14 @@ const (
 	groupsScenesTable     = "groups_scenes"
 	scenesURLsTable       = "scene_urls"
 	sceneURLColumn        = "url"
-	scenesViewDatesTable  = "scenes_view_dates"
-	sceneViewDateColumn   = "view_date"
-	scenesODatesTable     = "scenes_o_dates"
-	sceneODateColumn      = "o_date"
+	// ⚠️ scenes_view_dates backs PLAY history, not view history - the name predates the
+	// rename of "views" to "plays". View history is scenes_viewed_dates, below.
+	scenesViewDatesTable   = "scenes_view_dates"
+	sceneViewDateColumn    = "view_date"
+	scenesViewedDatesTable = "scenes_viewed_dates"
+	sceneViewedDateColumn  = "viewed_date"
+	scenesODatesTable      = "scenes_o_dates"
+	sceneODateColumn       = "o_date"
 
 	sceneCoverBlobColumn = "cover_blob"
 )
@@ -204,6 +208,7 @@ type SceneStore struct {
 	tableMgr *table
 	oDateManager
 	viewDateManager
+	viewedDateManager
 
 	repo *storeRepository
 }
@@ -219,10 +224,11 @@ func NewSceneStore(r *storeRepository, blobStore *BlobStore) *SceneStore {
 			fk:    scenesCustomFieldsTable.Col(sceneIDColumn),
 		},
 
-		tableMgr:        sceneTableMgr,
-		viewDateManager: viewDateManager{scenesViewTableMgr},
-		oDateManager:    oDateManager{scenesOTableMgr},
-		repo:            r,
+		tableMgr:          sceneTableMgr,
+		viewDateManager:   viewDateManager{scenesViewTableMgr},
+		viewedDateManager: viewedDateManager{scenesViewedTableMgr},
+		oDateManager:      oDateManager{scenesOTableMgr},
+		repo:              r,
 	}
 }
 
@@ -1171,6 +1177,7 @@ var sceneSortOptions = sortOptions{
 	"interactive_speed",
 	"last_o_at",
 	"last_played_at",
+	"last_viewed_at",
 	"movie_scene_number",
 	"o_counter",
 	"organized",
@@ -1178,6 +1185,7 @@ var sceneSortOptions = sortOptions{
 	"play_count",
 	"play_duration",
 	"resume_time",
+	"view_count",
 	"path",
 	"perceptual_similarity",
 	"random",
@@ -1301,6 +1309,10 @@ func (qb *SceneStore) setSceneSort(query *queryBuilder, findFilter *models.FindF
 		query.sortAndPagination += getCountSort(sceneTable, scenesViewDatesTable, sceneIDColumn, direction)
 	case "last_played_at":
 		query.sortAndPagination += fmt.Sprintf(" ORDER BY (SELECT MAX(view_date) FROM %s AS sort WHERE sort.%s = %s.id) %s", scenesViewDatesTable, sceneIDColumn, sceneTable, getSortDirection(direction))
+	case "view_count":
+		query.sortAndPagination += getCountSort(sceneTable, scenesViewedDatesTable, sceneIDColumn, direction)
+	case "last_viewed_at":
+		query.sortAndPagination += fmt.Sprintf(" ORDER BY (SELECT MAX(%s) FROM %s AS sort WHERE sort.%s = %s.id) %s", sceneViewedDateColumn, scenesViewedDatesTable, sceneIDColumn, sceneTable, getSortDirection(direction))
 	case "last_o_at":
 		query.sortAndPagination += fmt.Sprintf(" ORDER BY (SELECT MAX(o_date) FROM %s AS sort WHERE sort.%s = %s.id) %s", scenesODatesTable, sceneIDColumn, sceneTable, getSortDirection(direction))
 	case "o_counter":

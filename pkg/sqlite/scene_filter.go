@@ -174,6 +174,20 @@ func (qb *sceneFilterHandler) criterionHandler() criterionHandler {
 			}
 		}),
 
+		qb.viewCountCriterionHandler(sceneFilter.ViewCount),
+		criterionHandlerFunc(func(ctx context.Context, f *filterBuilder) {
+			if sceneFilter.LastViewedAt != nil {
+				f.addLeftJoin(
+					fmt.Sprintf("(SELECT %s, MAX(%s) as last_viewed_at FROM %s GROUP BY %s)", sceneIDColumn, sceneViewedDateColumn, scenesViewedDatesTable, sceneIDColumn),
+					"scene_last_viewed",
+					fmt.Sprintf("scene_last_viewed.%s = scenes.id", sceneIDColumn),
+				)
+				// never viewed sorts and filters as year zero, matching last_played_at
+				h := timestampCriterionHandler{sceneFilter.LastViewedAt, "IFNULL(last_viewed_at, datetime(0))", nil}
+				h.handle(ctx, f)
+			}
+		}),
+
 		qb.tagsCriterionHandler(sceneFilter.Tags),
 		qb.tagCountCriterionHandler(sceneFilter.TagCount),
 		qb.performersCriterionHandler(sceneFilter.Performers),
@@ -284,6 +298,16 @@ func (qb *sceneFilterHandler) addFoldersTable(f *filterBuilder, joinType joinTyp
 func (qb *sceneFilterHandler) addVideoFilesTable(f *filterBuilder, joinType joinType) {
 	qb.addSceneFilesTable(f, joinType)
 	f.addJoin(joinType, videoFileTable, "", "video_files.file_id = scenes_files.file_id")
+}
+
+func (qb *sceneFilterHandler) viewCountCriterionHandler(count *models.IntCriterionInput) criterionHandlerFunc {
+	h := countCriterionHandlerBuilder{
+		primaryTable: sceneTable,
+		joinTable:    scenesViewedDatesTable,
+		primaryFK:    sceneIDColumn,
+	}
+
+	return h.handler(count)
 }
 
 func (qb *sceneFilterHandler) playCountCriterionHandler(count *models.IntCriterionInput) criterionHandlerFunc {

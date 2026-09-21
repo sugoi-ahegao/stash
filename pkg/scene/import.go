@@ -17,6 +17,7 @@ import (
 type ImporterReaderWriter interface {
 	models.SceneCreatorUpdater
 	models.ViewHistoryWriter
+	models.ViewedHistoryWriter
 	models.OHistoryWriter
 	models.CustomFieldsWriter
 	FindByFileID(ctx context.Context, fileID models.FileID) ([]*models.Scene, error)
@@ -39,6 +40,7 @@ type Importer struct {
 	customFields   map[string]interface{}
 	coverImageData []byte
 	viewHistory    []time.Time
+	viewedHistory  []time.Time
 	oHistory       []time.Time
 }
 
@@ -80,6 +82,7 @@ func (i *Importer) PreImport(ctx context.Context) error {
 	i.customFields = i.Input.CustomFields
 
 	i.populateViewHistory()
+	i.populateViewedHistory()
 	i.populateOHistory()
 
 	return nil
@@ -150,6 +153,17 @@ func (i *Importer) populateViewHistory() {
 		i.Input.PlayHistory,
 		i.Input.PlayCount,
 		i.Input.LastPlayedAt,
+		i.Input.CreatedAt,
+	)
+}
+
+// view history has no derived count/last-date columns to fall back on, so it is imported
+// straight from the recorded times
+func (i *Importer) populateViewedHistory() {
+	i.viewedHistory = getHistory(
+		i.Input.ViewHistory,
+		0,
+		i.Input.CreatedAt,
 		i.Input.CreatedAt,
 	)
 }
@@ -426,6 +440,17 @@ func (i *Importer) addViewHistory(ctx context.Context) error {
 	return nil
 }
 
+func (i *Importer) addViewedHistory(ctx context.Context) error {
+	if len(i.viewedHistory) > 0 {
+		_, err := i.ReaderWriter.AddViewed(ctx, i.ID, i.viewedHistory)
+		if err != nil {
+			return fmt.Errorf("error adding viewed date: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (i *Importer) addOHistory(ctx context.Context) error {
 	if len(i.oHistory) > 0 {
 		_, err := i.ReaderWriter.AddO(ctx, i.ID, i.oHistory)
@@ -446,6 +471,10 @@ func (i *Importer) PostImport(ctx context.Context, id int) error {
 
 	// add histories
 	if err := i.addViewHistory(ctx); err != nil {
+		return err
+	}
+
+	if err := i.addViewedHistory(ctx); err != nil {
 		return err
 	}
 
