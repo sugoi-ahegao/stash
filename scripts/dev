@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+# Development servers for the stash checkout you're standing in.
+#
+#   checkout with .local/   its own library and port, from .local/config.yml
+#                           (make server-start). The main checkout's is the dev library, :9998
+#   preview worktree        that preview's library and port (see scripts/preview), so a
+#                           branch runs against its copy and never against dev or production
+#
+# The UI is Vite, pointed at whichever backend belongs to this checkout. Its port is
+# STASH_UI_PORT in ui/v2.5/.env.development.local (written per checkout by
+# scripts/worktree), or Vite's 3000 where there's none, as in previews.
+#
+# Usage: scripts/dev <server|ui|both>   (run with no arguments for help)
+
+set -euo pipefail
+
+die() { echo "dev: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not inside a git checkout ($PWD)"
+[[ -d "$ROOT/cmd/stash" ]] || die "$ROOT isn't a stash checkout"
+MAIN_CHECKOUT="$(git -C "$ROOT" worktree list --porcelain | sed -n '1s/^worktree //p')"
+PREVIEW_ROOT="${STASH_PREVIEW_ROOT:-$(dirname "$MAIN_CHECKOUT")/stash-previews}"
+
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+# what this checkout is, and the port its backend uses
+if [[ "$(dirname "$ROOT")" == "$PREVIEW_ROOT" ]]; then
+	KIND=preview
+	NAME="$(basename "$ROOT")"
+	DATA="$PREVIEW_ROOT/.data/$NAME"
+	[[ -f "$DATA/config.yml" ]] || die "preview $NAME has no library yet, run: scripts/preview up $NAME"
+	PORT="$(cat "$DATA/port")"
+elif [[ -f "$ROOT/.local/config.yml" ]]; then
+	KIND=local
+	PORT="$(sed -n 's/^port: *//p' "$ROOT/.local/config.yml")"
+	# a config copied from another checkout can still name that checkout's database
+	db="$(sed -n 's/^database: *//p' "$ROOT/.local/config.yml")"
+	[[ -z "$db" || "$db" != /* || "$db" == "$ROOT/"* ]] ||
+		die "$ROOT/.local/config.yml uses another checkout's database ($db); two servers would share one library"
+else
+	die "$ROOT has no library of its own (.local/config.yml). Make it a preview (scripts/preview new <branch>) or run this from $MAIN_CHECKOUT"
+fi
+[[ -n "$PORT" ]] || die "couldn't work out the backend port for $ROOT"
+[[ "$PORT" != 9999 ]] || die "this checkout's backend is configured for :9999, which is production's"
+
+UI_PORT="$(sed -n 's/^STASH_UI_PORT=//p' "$ROOT/ui/v2.5/.env.development.local" 2>/dev/null | tail -n1)"
+UI_PORT="${UI_PORT:-3000}"
+
+cmd_server() {
+	port_in_use "$PORT" && die "something is already on :$PORT$([[ $KIND == preview ]] && echo " (stop the preview with: scripts/preview down $NAME)")"
+
+	if [[ $KIND == local ]]; then
+		info "Backend on :$PORT ($ROOT/.local)"
+		exec make -C "$ROOT" server-start
+	fi
+
+	info "Building $NAME"
+	make -C "$ROOT" --no-print-directory stash
+	info "Preview $NAME backend on :$PORT ($DATA)"
+	cd "$DATA"
+	STASH_CONFIG_FILE="$DATA/config.yml" exec "$ROOT/stash"
+}
+
+cmd_ui() {
+	port_in_use "$UI_PORT" && die "something is already on :$UI_PORT (this checkout's UI already running?)"
+	[[ -d "$ROOT/ui/v2.5/node_modules" ]] || make -C "$ROOT" pre-ui
+	info "UI on http://localhost:$UI_PORT, talking to :$PORT"
+	# the port goes on the command line: a branch's own vite.config.js may predate STASH_UI_PORT,
+	# and without --strictPort vite drifts to the next free port instead of failing
+	cd "$ROOT/ui/v2.5"
+	VITE_APP_PLATFORM_PORT="$PORT" VITE_APP_GITHASH="$(git rev-parse --short HEAD)" \
+		exec pnpm run start --host --port "$UI_PORT" --strictPort
+}
+
+# restart the backend in the background, then the UI in the foreground
+cmd_both() {
+	local log="/tmp/stash-dev-$(basename "$ROOT").log" pid
+	pid="$(ss -ltnpH "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -n1 || true)"
+	if [[ -n "$pid" ]]; then
+		info "Stopping the backend on :$PORT"
+		kill "$pid"
+		for _ in $(seq 20); do port_in_use "$PORT" || break; sleep 0.5; done
+	fi
+
+	info "Starting the backend in the background (log: $log)"
+	"$0" server >"$log" 2>&1 &
+	for _ in $(seq 180); do
+		port_in_use "$PORT" && break
+		kill -0 $! 2>/dev/null || die "backend exited during startup, see $log"
+		sleep 1
+	done
+	port_in_use "$PORT" || die "backend didn't open :$PORT within 3 minutes, see $log"
+
+	cmd_ui
+}
+
+usage() {
+	cat <<EOF
+Development servers for this checkout ($KIND: $ROOT, backend :$PORT).
+
+  stash server   backend in the foreground. Ctrl-C and rerun after Go changes
+  stash ui       Vite on :$UI_PORT, hot-reloading, talking to :$PORT
+  stash both     restart the backend in the background, then the UI
+EOF
+}
+
+case "${1:-}" in
+server | ui | both) "cmd_$1" ;;
+"" | help | -h | --help) usage ;;
+*) die "unknown command '$1' (run with no arguments for help)" ;;
+esac
