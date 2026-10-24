@@ -9,6 +9,10 @@
 #                           and bare names (`List/ItemList.tsx:29`, `scene.go:1013`) are
 #                           matched against the end of tracked paths, and checked when
 #                           exactly one file matches.
+#   `some/file.go`          the file exists, matched the same way. Not checked in
+#                           FORK_CHANGELOG.md, which is history and names files that have
+#                           since moved, nor for patterns (`N_description.up.sql`,
+#                           `2_scene_my_field.up.sql`, `../x.go`) or generated files.
 #   [text](relative/path)   the link's target exists.
 #
 # And in code the fork changed, any docs/codebase/ or docs/decisions/ path in a comment
@@ -32,12 +36,15 @@ DOCS=(CLAUDE.md FORK_CHANGELOG.md docs/codebase docs/decisions .claude/skills pk
 broken=0
 report() { echo "    $1: $2"; broken=$((broken + 1)); }
 
-# the tracked file a reference names: prints it and succeeds, prints nothing and succeeds
-# if several files match (ambiguous, so unchecked), fails if none does
+# tracked files, and new ones not yet committed
+FILES="$(git ls-files --cached --others --exclude-standard)"
+
+# the file a reference names: prints it and succeeds, prints nothing and succeeds if
+# several files match (ambiguous, so unchecked), fails if none does
 resolve() {
 	local ref="$1" matches
 	[[ -f "$ref" ]] && { echo "$ref"; return; }
-	matches="$(git ls-files | grep -E "(^|/)${ref//./\\.}\$" || true)"
+	matches="$(grep -E "(^|/)${ref//./\\.}\$" <<<"$FILES" || true)"
 	[[ -n "$matches" ]] || return 1
 	if [[ "$(wc -l <<<"$matches")" == 1 ]]; then echo "$matches"; fi
 }
@@ -57,6 +64,14 @@ while IFS= read -r doc; do
 		length="$(wc -l <"$target")"
 		((line <= length)) || report "$doc:$lineno" "\`$ref\` is past the end of $target ($length lines)"
 	done < <(grep -noE '`[A-Za-z0-9_./-]+\.[a-z]+:[0-9]+(-[0-9]+)?`' "$doc" | tr -d '`')
+
+	# bare `file.ext`, no line number
+	if [[ "$doc" != FORK_CHANGELOG.md ]]; then
+		while IFS=: read -r lineno ref; do
+			[[ "$ref" =~ ^\.|^path/to/|(^|/)N_|my_|generated ]] && continue # patterns, examples
+			resolve "$ref" >/dev/null || report "$doc:$lineno" "\`$ref\` names a file that doesn't exist"
+		done < <(grep -noE '`[A-Za-z0-9_./-]+\.(go|ts|tsx|js|scss|css|graphql|sql|py|yml|yaml|json|md|sh)`' "$doc" | tr -d '`' || true)
+	fi
 
 	# relative markdown links
 	while IFS=: read -r lineno link; do

@@ -84,6 +84,7 @@ shown in the app. Never put fork changes there.
 
 When a change alters behaviour that `docs/codebase/` or `docs/decisions/` describes,
 update that doc in the same change. When you choose between real alternatives, add a
-decision. `scripts/doc-refs` (part of `scripts/check`) catches `file:line` references that
-point past the end of a file or at nothing. A line that still exists but now holds
-different code isn't caught, so prefer naming the symbol next to the line number.
+decision. `scripts/doc-refs` (part of `scripts/check`) catches backticked file paths that
+name nothing, and `file:line` references that point past the end of a file. A line that
+still exists but now holds different code isn't caught, so prefer naming the symbol next to
+the line number.

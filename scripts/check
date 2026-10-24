@@ -8,7 +8,7 @@
 #                pins v2.11.4), go test with the Makefile's SQLite tags
 #   ui           biome lint, stylelint, tsc, biome format (pnpm validate, step by step)
 #   migrations   the fork's migration rules (scripts/upstream-sync check)
-#   docs         file:line references and links in the fork's docs (scripts/doc-refs)
+#   docs         file paths, file:line references and links in the fork's docs (scripts/doc-refs)
 #   changelog    FORK_CHANGELOG.md is current (a warning only: it trails every commit)
 #
 # Every step runs even if an earlier one fails, and a summary comes last.
