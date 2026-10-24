@@ -35,17 +35,9 @@ upstream commits had no server-side conflicts.
                                            names, membership diffing, generate trigger
 
   NEW  ui/v2.5/src/core/forkConfig.ts       the fork's settings (featured group, golden tag,
-       Settings/SettingsInterfacePanel/       intake folder, view on hover), stored in the
-         ForkSettings.tsx                     UI config; Settings > Interface > This Library
+       Settings/SettingsInterfacePanel/       view on hover), stored in the UI config;
+         ForkSettings.tsx                     Settings > Interface > This Library
   MOD  core/config.ts, SettingsInterfacePanel.tsx   their keys, and the section's call site
-
-  NEW  ui/v2.5/src/core/collections.ts            collection derivation rules (see doc 10)
-  NEW  ui/v2.5/src/components/Scenes/
-         SceneCollectionPanel.tsx                 the Collections display mode
-  MOD  ui/v2.5/graphql/queries/folder.graphql     + FindCollectionFolders
-  MOD  list-filter/{types,scenes,filter}.ts,      register the mode, thread
-       List/{util,ListViewOptions}.tsx,             defaultDisplayMode
-       Scenes/SceneList.tsx
 
   MOD  App.tsx, MainNavbar.tsx, List/views.ts    wire up the /landing route
   MOD  graphql/queries/scene.graphql             2 new queries
@@ -101,13 +93,12 @@ config, which the server can read too, and read through `src/core/forkConfig.ts`
 |---|---|---|
 | Featured group (`featuredGroupId`) | the carousel's group (Feature 1); the server reads it too | no carousel, no featured button, nothing stamped |
 | Golden tag (`goldenTagId`) | golden cards (Feature 6) | nothing is golden, no golden button |
-| Collections intake folder (`collectionsFolder`) | Collections' rows (Feature 5) | Collections shows nothing |
 | View on hover, landing (`viewOnHoverLanding`) | Feature 4 | on |
 | View on hover, Scenes page (`viewOnHoverScenes`) | Feature 4 | off |
 
-⚠️ An install that has never set them has no carousel, golden cards or collections. Before
-the settings existed these were constants (group `25`, tag `1414`, folder `New`), so a
-fresh production database needs them set once.
+⚠️ An install that has never set them has no carousel or golden cards. Before the settings
+existed these were constants (group `25`, tag `1414`), so a fresh production database needs
+them set once.
 
 ---
 
@@ -383,7 +374,7 @@ An eye/eye-slash button in the list view options that hides scene grid thumbnail
         │
         └─ passes showThumbnails / onSetShowThumbnails down through
               FilteredListToolbar → ListViewOptions → ThumbnailToggle
-                 (rendered only in the Grid and Collections display modes)
+                 (rendered only in the Grid display mode)
 ```
 
 The choice is stored in the interface local forage's `viewConfig`, beside the sidebar's
@@ -548,37 +539,16 @@ visible as a scroll affordance. Anything at or above `100vh` will hide it again.
 
 ---
 
-## Feature 5 — Collections
+## Feature 5 — Collections (removed)
 
-A **Collections** display mode for the scene list, alongside Grid / List / Wall / Tagger:
-one row of scene cards per intake folder — the top-level folders inside each library root's
-intake directory (the `collectionsFolder` setting, `New` in this library). `/landing` opens
-in it.
+There was a Collections display mode for the scene list: one row of scene cards per intake
+folder, `/landing` opened in it. It has been taken out entirely, along with its
+`collectionsFolder` setting and the `defaultDisplayMode` option it threaded through the list
+filter. Its number is kept so the other features keep theirs.
 
-**[Doc 10](10-collections.md) is the full write-up** — read it before changing any of it.
-The short version:
-
-- A collection is **derived, not stored**: `<library root>/<intake>/<name>`, one level deep. Its
-  name is often a date but just as often a pack name, and **nothing is assumed about it**.
-- A collection is a **name**, not a folder — the same name under two roots is one collection
-  holding both roots' scenes.
-- It needed **no backend change**. Roots come from `configuration.general.stashes`, one
-  folder query supplies the paths, and a collection's scenes are the *existing*
-  `FolderCriterion` with a computed value.
-- Because it is a display mode it composes with every filter: narrow the list and every row
-  narrows with it.
-
-⚠️ Unlike the other display modes, this one **ignores the page of scenes it is handed** and
-pages over folders instead. `SceneList.tsx` therefore exempts it from the `scenes.length === 0`
-early return and hides the outer scene pagination while it is active. If you touch either,
-keep both in step.
-
-⚠️ `collectionFilter` must set `depth: -1`; the criterion defaults it to `0`, which matches
-only files directly inside the collection folder. Measured here, one collection went from 16
-scenes to 6. It fails silently.
-
-This one needs no server change: the only schema-adjacent edit is a new query *document* in
-`ui/v2.5/graphql/`, which is a client document, not server schema.
+⚠️ `DisplayMode` value `4` was Collections. Saved views and URLs (`disp=4`) may still hold
+it, so `ListFilterModel` drops any mode the list doesn't offer (`offeredDisplayMode`) and
+`types.ts` keeps `4` unused. Don't reuse it.
 
 ---
 
@@ -625,12 +595,6 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
   a realistic path rather than a rewrite. The exception is the server-side lifecycle in
   `internal/api`; the plugin-API route would put that logic behind a `SceneUpdatePost`
   hook instead.
-- **Feature 5 (collections)** is library-specific by construction — it assumes a foldering
-  convention upstream has no reason to assume — so it belongs in a plugin, and it is already
-  shaped like one: no schema, no Go, an existing criterion, and all its rules in one pure
-  module. The awkward part for a plugin is the display mode itself: `DisplayMode` is a core
-  enum, so a plugin would patch `SceneList` rather than add a mode. The intake folder is
-  already in `IUIConfig`.
 - **Feature 4 (view history)** leaves upstream's play semantics alone, which makes it
   far more upstreamable than the play-on-open it replaced. It is real schema, though: a
   table, filters, sorts and mutations. Upstream would want the migration in its own

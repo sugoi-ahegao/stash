@@ -16,7 +16,8 @@ export enum DisplayMode {
   List,
   Wall,
   Tagger,
-  Collections,
+  // fork: 4 was Collections, since removed. Saved views may still hold it, so
+  // don't reuse it.
 }
 
 export interface ILabeledId {

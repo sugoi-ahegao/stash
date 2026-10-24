@@ -1,7 +1,6 @@
 import React from "react";
 import { Helmet } from "react-helmet";
 import { useTitleProps } from "src/hooks/title";
-import { DisplayMode } from "src/models/list-filter/types";
 import { lazyComponent } from "src/utils/lazyComponent";
 import { View } from "../List/views";
 import { FeaturedCarousel } from "./FeaturedCarousel";
@@ -15,12 +14,8 @@ const Landing: React.FC = () => {
     <div id="landing-page">
       <Helmet {...titleProps} />
       <FeaturedCarousel />
-      {/* the landing list opens in Collections; the view remembers any other choice */}
       <ViewOnHover page="landing">
-        <SceneList
-          view={View.Landing}
-          defaultDisplayMode={DisplayMode.Collections}
-        />
+        <SceneList view={View.Landing} />
       </ViewOnHover>
     </div>
   );

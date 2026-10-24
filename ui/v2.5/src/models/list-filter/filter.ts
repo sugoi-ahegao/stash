@@ -55,7 +55,6 @@ export class ListFilterModel {
   public criteria: Array<Criterion> = [];
   public randomSeed = -1;
   private defaultZoomIndex: number = 1;
-  private defaultDisplayMode?: DisplayMode;
 
   public constructor(
     mode: FilterMode,
@@ -64,13 +63,12 @@ export class ListFilterModel {
       defaultZoomIndex?: number;
       defaultSortBy?: string;
       defaultSortDir?: SortDirectionEnum;
-      defaultDisplayMode?: DisplayMode;
     }
   ) {
     this.mode = mode;
     this.config = config;
     this.options = getFilterOptions(mode);
-    const { defaultSortBy } = this.options;
+    const { defaultSortBy, displayModeOptions } = this.options;
 
     if (options?.defaultSortBy) {
       this.sortBy = options.defaultSortBy;
@@ -83,29 +81,19 @@ export class ListFilterModel {
         this.sortDirection = SortDirectionEnum.Desc;
       }
     }
-    // a view may prefer a different mode - /landing opens in Collections
-    this.defaultDisplayMode = options?.defaultDisplayMode;
-    this.displayMode = this.effectiveDisplayMode();
+    this.displayMode = displayModeOptions[0];
     if (options?.defaultZoomIndex !== undefined) {
       this.defaultZoomIndex = options.defaultZoomIndex;
       this.zoomIndex = options.defaultZoomIndex;
     }
   }
 
-  // the display mode this filter falls back to when the query string doesn't
-  // specify one. Not necessarily DEFAULT_PARAMS.displayMode - a view can ask
-  // for a different default, and not every mode list starts with Grid.
-  private effectiveDisplayMode() {
-    const { displayModeOptions } = this.options;
-
-    if (
-      this.defaultDisplayMode !== undefined &&
-      displayModeOptions.includes(this.defaultDisplayMode)
-    ) {
-      return this.defaultDisplayMode;
-    }
-
-    return displayModeOptions[0];
+  // fork: a saved view or URL can hold a mode this list no longer offers (the
+  // removed Collections mode), which would otherwise render nothing
+  private offeredDisplayMode(mode: DisplayMode | undefined) {
+    return mode !== undefined && this.options.displayModeOptions.includes(mode)
+      ? mode
+      : undefined;
   }
 
   public clone() {
@@ -120,7 +108,6 @@ export class ListFilterModel {
   public empty() {
     return new ListFilterModel(this.mode, this.config, {
       defaultZoomIndex: this.defaultZoomIndex,
-      defaultDisplayMode: this.defaultDisplayMode,
     });
   }
 
@@ -171,9 +158,7 @@ export class ListFilterModel {
           ? SortDirectionEnum.Desc
           : SortDirectionEnum.Asc;
     }
-    if (params.disp !== undefined) {
-      this.displayMode = params.disp;
-    }
+    this.displayMode = this.offeredDisplayMode(params.disp) ?? this.displayMode;
     if (params.q !== undefined) {
       this.searchTerm = params.q;
     }
@@ -325,7 +310,8 @@ export class ListFilterModel {
     this.sortDirection = findFilter?.direction ?? this.sortDirection;
     this.searchTerm = findFilter?.q ?? this.searchTerm;
 
-    this.displayMode = uiOptions?.display_mode ?? this.displayMode;
+    this.displayMode =
+      this.offeredDisplayMode(uiOptions?.display_mode) ?? this.displayMode;
     this.zoomIndex = uiOptions?.zoom_index ?? this.zoomIndex;
 
     this.currentPage = 1;
@@ -400,11 +386,8 @@ export class ListFilterModel {
           : this.sortDirection === SortDirectionEnum.Desc
             ? "desc"
             : undefined,
-      // compare against this filter's own default, not the global one, so that
-      // choosing e.g. Grid on a view that defaults to Collections is encoded
-      // rather than dropped and then re-defaulted back to Collections
       disp:
-        this.displayMode !== this.effectiveDisplayMode()
+        this.displayMode !== DEFAULT_PARAMS.displayMode
           ? String(this.displayMode)
           : undefined,
       q: this.searchTerm ? encodeURIComponent(this.searchTerm) : undefined,

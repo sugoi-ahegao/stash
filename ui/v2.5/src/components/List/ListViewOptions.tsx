@@ -14,7 +14,6 @@ import { IntlShape, useIntl } from "react-intl";
 import { Icon } from "../Shared/Icon";
 import {
   faChevronDown,
-  faLayerGroup,
   faList,
   faSquare,
   faTags,
@@ -41,8 +40,6 @@ function getIcon(option: DisplayMode) {
       return faSquare;
     case DisplayMode.Tagger:
       return faTags;
-    case DisplayMode.Collections:
-      return faLayerGroup;
   }
 }
 
@@ -60,9 +57,6 @@ function getLabelId(option: DisplayMode) {
       break;
     case DisplayMode.Tagger:
       displayModeId = "tagger";
-      break;
-    case DisplayMode.Collections:
-      displayModeId = "collections";
       break;
   }
   return `display_mode.${displayModeId}`;
@@ -107,18 +101,12 @@ export const ListViewOptions: React.FC<IListViewOptionsProps> = ({
         onSetDisplayMode(DisplayMode.Tagger);
       }
     });
-    Mousetrap.bind("v c", () => {
-      if (displayModeOptions.includes(DisplayMode.Collections)) {
-        onSetDisplayMode(DisplayMode.Collections);
-      }
-    });
 
     return () => {
       Mousetrap.unbind("v g");
       Mousetrap.unbind("v l");
       Mousetrap.unbind("v w");
       Mousetrap.unbind("v t");
-      Mousetrap.unbind("v c");
     };
   });
 

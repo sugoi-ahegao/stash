@@ -19,7 +19,6 @@ Read [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) first for build/run instructions
 | 07 | [This fork](07-this-fork.md) | You want to know what diverges from upstream `develop` on this branch |
 | 08 | [Frontend component map](08-frontend-components.md) | You want to know what components exist, how they nest, and where to add a new one |
 | 09 | [Parallel experiments](09-parallel-experiments.md) | Superseded by 11 |
-| 10 | [Collections](10-collections.md) | You want to know how the Collections display mode groups scenes by their intake folder |
 | 11 | [Production, development and worktrees](11-production-and-dev.md) | You want to ship to the Windows production install, refresh dev data, or try a branch in its own worktree (wt) with its own library and ports |
 | 12 | [Keeping up with upstream](12-upstream-sync.md) | You're merging upstream stash, adding a migration, or adding server code that has to survive upstream merges |
 

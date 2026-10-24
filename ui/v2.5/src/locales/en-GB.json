@@ -926,10 +926,6 @@
         }
       },
       "this_library": {
-        "collections_folder": {
-          "description": "The folder inside each library path whose subfolders are the Collections display mode's rows. With none set, Collections shows nothing.",
-          "heading": "Collections intake folder"
-        },
         "description": "Point this fork's features at things in your library. With none set, a feature stays off.",
         "featured_group": {
           "description": "The group whose scenes the landing page carousel shows. Adding a scene to it stamps when it joined and generates its previews.",
@@ -1147,7 +1143,6 @@
   "director": "Director",
   "disambiguation": "Disambiguation",
   "display_mode": {
-    "collections": "Collections",
     "grid": "Grid",
     "label_current": "Display Mode: {current}",
     "list": "List",

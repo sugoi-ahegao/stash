@@ -121,7 +121,6 @@ export interface IUIConfig {
   // fork: read through src/core/forkConfig.ts, not directly
   featuredGroupId?: string;
   goldenTagId?: string;
-  collectionsFolder?: string;
   viewOnHoverLanding?: boolean;
   viewOnHoverScenes?: boolean;
 }

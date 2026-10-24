@@ -19,7 +19,7 @@ there only conflict on the next merge.
 | changing the schema or storage | [04 migrations](docs/codebase/04-database-migrations.md), [12 upstream sync](docs/codebase/12-upstream-sync.md), the `add-field` skill |
 | working in the UI | [05 frontend architecture](docs/codebase/05-frontend-architecture.md), [08 components](docs/codebase/08-frontend-components.md) |
 | looking for a recipe or a known trap | [06 recipes & gotchas](docs/codebase/06-recipes-and-gotchas.md) |
-| changing a fork feature | [07 this fork](docs/codebase/07-this-fork.md), [10 collections](docs/codebase/10-collections.md) |
+| changing a fork feature | [07 this fork](docs/codebase/07-this-fork.md) |
 | running, shipping, worktrees | [11 production & dev](docs/codebase/11-production-and-dev.md) |
 | wondering why something is the way it is | [`docs/decisions/`](docs/decisions/README.md) |
 | wondering what changed recently | [`FORK_CHANGELOG.md`](FORK_CHANGELOG.md), `git log` |

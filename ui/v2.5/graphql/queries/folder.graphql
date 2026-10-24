@@ -46,14 +46,3 @@ query FindFolderHierarchyForIDs($ids: [ID!]!) {
     }
   }
 }
-
-# Every folder in the library, id/path/basename only. Collections are derived from these
-# paths client-side against the configured library roots - see src/core/collections.ts.
-query FindCollectionFolders {
-  findFolders(filter: { per_page: -1, sort: "path", direction: ASC }) {
-    count
-    folders {
-      ...SelectFolderData
-    }
-  }
-}

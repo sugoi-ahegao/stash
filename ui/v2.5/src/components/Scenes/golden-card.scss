@@ -653,27 +653,3 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
     }
   }
 }
-
-// Collections display mode. The rows themselves reuse the front page's
-// .recommendation-row markup and styling, which is global, so only the side gutter that
-// .recommendations-container would normally provide is needed here.
-.scene-collections {
-  padding-left: 20px;
-  padding-right: 20px;
-
-  @media (max-width: 576px) {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .recommendation-row:last-of-type {
-    margin-bottom: 1rem;
-  }
-
-  // the row sort sits above the pagination, mirroring the list toolbar it replaces
-  .collections-toolbar {
-    display: flex;
-    justify-content: center;
-    padding-top: 0.5rem;
-  }
-}

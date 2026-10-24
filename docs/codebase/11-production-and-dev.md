@@ -121,8 +121,7 @@ So every copy between the two converts paths:
 Zip contents are stored as folders under the zip (`…\photos.zip\000034.jpg`) and convert
 the same way; they don't exist as real files on disk.
 
-UI code that parses paths must accept both separators. `src/core/collections.ts:55` is
-the example.
+UI code that parses paths must accept both separators.
 
 ## Shipping
 

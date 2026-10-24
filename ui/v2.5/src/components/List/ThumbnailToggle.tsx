@@ -46,12 +46,7 @@ export const ThumbnailToggle: React.FC<
   const intl = useIntl();
 
   if (!onSetShowThumbnails || showThumbnails === undefined) return null;
-  if (
-    displayMode !== DisplayMode.Grid &&
-    displayMode !== DisplayMode.Collections
-  ) {
-    return null;
-  }
+  if (displayMode !== DisplayMode.Grid) return null;
 
   return (
     <Button

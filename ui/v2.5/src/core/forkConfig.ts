@@ -6,16 +6,13 @@ import { IUIConfig } from "./config";
 // Interface > This library, see ForkSettings.tsx), so the server can read them
 // too: internal/api/scene_featured.go reads featuredGroupId.
 //
-// An ID or folder that isn't set turns its feature off: no carousel without a
-// featured group, no golden cards without a golden tag, no collections without
-// an intake folder.
+// An ID that isn't set turns its feature off: no carousel without a featured
+// group, no golden cards without a golden tag.
 export interface IForkConfig {
   // the group whose scenes the landing page carousel shows
   featuredGroupId?: string;
   // the tag that makes a scene golden
   goldenTagId?: string;
-  // the folder inside each library root whose children are the collections
-  collectionsFolder?: string;
   // whether the UI records views at all: off when the player's "track
   // activity" setting is
   recordViews: boolean;
@@ -32,7 +29,6 @@ export function forkConfig(ui: IUIConfig | undefined): IForkConfig {
   return {
     featuredGroupId: ui?.featuredGroupId || undefined,
     goldenTagId: ui?.goldenTagId || undefined,
-    collectionsFolder: ui?.collectionsFolder || undefined,
     recordViews,
     viewOnHover: {
       landing: recordViews && (ui?.viewOnHoverLanding ?? true),

@@ -45,8 +45,7 @@ The fork's rules for a conflict:
 - `pkg/sqlite/migrations/` and `appSchemaVersion` are always upstream's. Fork migrations
   stay in `migrations_fork/` with their own numbering.
 - `ui/v2.5/src/docs/en/Changelog/` is always upstream's.
-- A conflict in fork UI code (`Landing/`, `Scenes/SceneCollectionPanel.tsx`, list-filter
-  changes): keep both behaviours. If upstream changed an API the fork uses, adapt the fork
+- A conflict in fork UI code (`Landing/`, list-filter changes): keep both behaviours. If upstream changed an API the fork uses, adapt the fork
   side.
 
 `git add` each resolved file. If a conflict needs a real design choice, stop and ask.
