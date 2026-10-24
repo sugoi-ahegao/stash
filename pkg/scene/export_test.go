@@ -221,6 +221,7 @@ func TestToJSON(t *testing.T) {
 	db.Scene.On("GetCover", testCtx, mock.Anything).Return(nil, nil)
 	db.Scene.On("GetViewDates", testCtx, mock.Anything).Return(nil, nil)
 	db.Scene.On("GetODates", testCtx, mock.Anything).Return(nil, nil)
+	db.Scene.On("GetViewedDates", testCtx, mock.Anything).Return(nil, nil)
 	db.Scene.On("GetCustomFields", testCtx, customFieldsID).Return(customFields, nil).Once()
 	db.Scene.On("GetCustomFields", testCtx, errCustomFieldsID).Return(nil, errors.New("error getting custom fields")).Once()
 	db.Scene.On("GetCustomFields", testCtx, mock.Anything).Return(emptyCustomFields, nil)
