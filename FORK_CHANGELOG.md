@@ -13,15 +13,19 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 ## 2026-10-24
 
 - **upstream sync**: merged stashapp/stash `develop` at `bdee3c83` (44 upstream commits) `8cf477772`. What they changed is in upstream's changelog, not here
+- feat(ui): library settings for the featured group, golden tag and intake folder `38fa82a5d`
 - feat(ui): theme switcher, the pb theme, and scene card previews `cd5271aa7`
 - feat(scripts): add dev, to run this checkout's backend and UI `4a9e63b30`
 - feat(scripts): give every worktrunk worktree its own library and ports `d77ff7009`
 - feat(scripts): add upstream-sync, and document keeping up with upstream `7726f769d`
 - fix(scripts): restart production after a UI-only ship `9a9c23c24`
 - fix(sqlite): track fork migrations in their own table `c77c887cc`
+- refactor(sqlite,api): move view history into fork-owned files `71bf7466d`
 - refactor(scripts): drop preview worktrees from dev `a441988bb`
 - refactor(api): reduce the fork's resolver changes to call sites `35bc891b3`
+- docs: fork settings, golden cards, view-history layout `7d66983f9`
 - docs, scripts: follow checkouts into stash.worktrees/ `05113d885`
+- chore(scripts): check plain file paths in doc-refs `aab3ff771`
 - chore: add CLAUDE.md, scripts/check, decision records and agent tooling `bffeb8dfd`
 - chore(stashbox): restore upstream's generated models `fa3a2a3df`
 - chore(scripts): add production and preview tooling `f70bf6b0e`
