@@ -23,7 +23,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - refactor(sqlite,api): move view history into fork-owned files `71bf7466d`
 - refactor(scripts): drop preview worktrees from dev `a441988bb`
 - refactor(api): reduce the fork's resolver changes to call sites `35bc891b3`
-- revert(ui): remove the Collections display mode `4117aeb88`
+- revert(ui): remove the Collections display mode `405acf8e9`
 - docs: fork settings, golden cards, view-history layout `7d66983f9`
 - docs, scripts: follow checkouts into stash.worktrees/ `05113d885`
 - chore(scripts): check plain file paths in doc-refs `aab3ff771`
