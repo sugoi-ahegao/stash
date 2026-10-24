@@ -3,9 +3,12 @@
 Everything that diverges from upstream `develop` on this branch, why it works the way it
 does, and what's load-bearing if you build on it.
 
-```
-$ git diff --stat develop...HEAD
- 34 files changed, 4165 insertions(+), 68 deletions(-)
+What changed and when is in [`FORK_CHANGELOG.md`](../../FORK_CHANGELOG.md). The current
+size of the divergence is a command, not a number to copy here:
+
+```bash
+git diff --stat $(git merge-base HEAD upstream/develop)   # everything the fork changes
+scripts/upstream-sync status                              # the upstream files it modifies
 ```
 
 **The divergence is mostly frontend, but no longer exclusively.** The featured-group
@@ -43,8 +46,18 @@ upstream commits had no server-side conflicts.
   MOD  graphql/queries/scene.graphql             2 new queries
   MOD  internal/api/resolver_mutation_scene.go   `// fork` call sites: the featured
                                                  lifecycle on every scene update path
-  MOD  Scenes/SceneDetails/Scene.tsx             count a page visit as a play
-  MOD  ScenePlayer/ScenePlayer.tsx               stop the player double-counting plays
+  NEW  internal/api/resolver_mutation_scene_view.go,   view history (Feature 4): store,
+       pkg/sqlite/history.go (viewedDateManager),    schema, filters, sorts, mutations,
+       pkg/sqlite/migrations_fork/1_*.up.sql,        dataloaders, import/export/merge
+       pkg/sqlite/fork_migrate.go,
+       internal/api/loaders/scene*view*_gen.go
+  MOD  Scenes/SceneDetails/Scene.tsx             a page visit records a view
+  MOD  Scenes/SceneCard.tsx, core/hoverView.ts,  mark-viewed button; a dwell on a landing
+       core/viewed.ts                            card records a view
+  MOD  SceneDetails/SceneHistoryPanel.tsx        View History beside play and O history
+  NEW  SceneDetails/FeaturedButton.tsx           featured toggle on the scene page
+  NEW  components/ThemeSwitcher.tsx,             theme switcher in the navbar: Blueprint
+       utils/theme.ts, styles/themes/_pb.scss    (default) and pb, per browser
   MOD  List/ListViewOptions.tsx,                 thumbnail visibility toggle
        List/FilteredListToolbar.tsx,
        Scenes/SceneList.tsx, Scenes/styles.scss
@@ -58,8 +71,8 @@ upstream commits had no server-side conflicts.
   MOD  locales/en-GB.json, index.scss
 ```
 
-Four independent features, plus a handful of standalone tweaks. Take them one at a
-time.
+Five numbered features below, plus a handful of standalone tweaks. Take them one at a
+time. (The theme switcher and featured toggle are recent and only in the table above.)
 
 ---
 
@@ -377,36 +390,39 @@ message. It should move to `locales/en-GB.json` before this goes anywhere near u
 
 ---
 
-## Feature 4 — Opening a scene counts as a play
+## Feature 4 — View history, apart from play history
 
-Upstream records a play once the player has watched `minimumPlayPercent` of the video.
-On this branch, **navigating to a scene page records the play immediately**, with no play
-duration.
+A **view** means the scene was surfaced to you. A **play** keeps upstream's meaning: the
+player ran past `minimumPlayPercent`. Why they're separate:
+[decision 0004](../decisions/0004-views-apart-from-plays.md). (Until 2026-09-21, opening
+a scene recorded a *play* and the player's own increment was disabled. That's gone.)
 
 ```
-  Scenes/SceneDetails/Scene.tsx    ScenePage effect, keyed on scene.id
-        │   guarded by a ref  → StrictMode's double-invoke fires once
-        │   respects ui.trackActivity
+  Scenes/SceneDetails/Scene.tsx    page opened: effect keyed on scene.id, guarded by a
+                                   ref (StrictMode fires once), respects ui.trackActivity
+  Scenes/SceneCard.tsx             landing page only: cursor on a card for hoverViewDelay
+                                   (3 s), once per card. The eye button: marked by hand,
+                                   lit while the last view falls on today
+        │
         ▼
-  sceneAddPlay(id)                 appends a view timestamp only;
-                                   it never touches play_duration
-        ▲
-        │  NOT called by the player any more
-  ScenePlayer/ScenePlayer.tsx      activity.incrementPlayCount = noop
-                                   saveActivity still reports duration + resume time
+  sceneAddView(id)  ──►  scenes_viewed_dates   (fork migration 1)
+                         view_history · view_count · last_viewed_at on Scene,
+                         filters + sorts, sceneDeleteView / sceneResetViewCount
+
+  ScenePlayer/ScenePlayer.tsx      incrementPlayCount  ──►  scenes_view_dates (upstream's
+                                   PLAY history, despite the name)
 ```
 
-The player's increment had to go: leaving both in place gave every watched scene **two**
-plays. `scene.id` changes as you move through the queue, so each scene in a playlist
-records its own play.
+⚠️ **The names cross over.** `viewedDateManager` / `scenes_viewed_dates` is VIEW history.
+Upstream's `viewDateManager` / `scenes_view_dates` is PLAY history.
 
-⚠️ **`minimumPlayPercent` no longer gates anything.** A play is recorded on open
-regardless of how much is watched — opening a scene and immediately leaving still counts.
-That is the intended semantic here ("play count" now means "times opened"), but it makes
-the config setting misleading, and it changes what play-count sorting and the
-`play_count` filter actually mean in this library.
-
-The manual "add play" control in `SceneHistoryPanel` is untouched.
+- The migration seeded view history from play history once. After that they're
+  independent.
+- `useSceneAddView` doesn't evict list caches by default, because a refetch would replace
+  the grid under the cursor. Pass `true` where a list should refresh.
+- Browsing the scenes list records nothing. Only the landing page counts dwells.
+- `SceneHistoryPanel` shows View History beside play and O history, with its own add,
+  delete and reset.
 
 ---
 
@@ -548,10 +564,10 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
   module. The awkward part for a plugin is the display mode itself: `DisplayMode` is a core
   enum, so a plugin would patch `SceneList` rather than add a mode. `IUIConfig` would hold
   the intake folder name.
-- **Feature 4 (play on open)** is a behaviour change to an existing metric, not an
-  addition, and upstream deliberately gates plays on `minimumPlayPercent`. Expect it to
-  be rejected as a default. It's viable upstream only as an opt-in config setting that
-  leaves the existing behaviour as the default.
+- **Feature 4 (view history)** leaves upstream's play semantics alone, which makes it
+  far more upstreamable than the play-on-open it replaced. It is real schema, though: a
+  table, filters, sorts and mutations. Upstream would want the migration in its own
+  stream, and the landing-page dwell is fork-specific.
 - **Native-resolution previews** are not upstreamable as-is — they change generation cost
   and disk usage for every install. Upstream would want a preview-width setting alongside
   `previewPreset` and the segment options, defaulting to the current `640`.

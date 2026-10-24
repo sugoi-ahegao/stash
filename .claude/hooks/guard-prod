@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# PreToolUse hook for Bash: asks the user before a command touches production (the Windows
+# stash.exe on :9999, docs/codebase/11-production-and-dev.md), replaces the dev library, or
+# commits a merge. Read-only commands (scripts/prod status, logs) pass through.
+
+set -euo pipefail
+
+cmd="$(jq -r '.tool_input.command // empty')"
+[[ -n "$cmd" ]] || exit 0
+
+ask() {
+	jq -n --arg r "$1" \
+		'{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
+	exit 0
+}
+
+if [[ "$cmd" =~ scripts/prod[[:space:]]+(setup|ship|start|stop|autostart) ]]; then
+	ask "This changes production (scripts/prod ${BASH_REMATCH[1]}). Production is the library actually in use."
+fi
+if [[ "$cmd" =~ scripts/prod[[:space:]]+pull-data ]]; then
+	ask "scripts/prod pull-data replaces the dev library with a copy of production's."
+fi
+if [[ "$cmd" =~ /mnt/c/Users/[^/[:space:]]+/\.stash ]]; then
+	ask "This command touches production's data directory (.stash on Windows)."
+fi
+if [[ "$cmd" =~ (stash\.exe|taskkill) ]]; then
+	ask "This command touches the production stash.exe process."
+fi
+if [[ "$cmd" =~ scripts/upstream-sync[[:space:]]+(start|finish) ]]; then
+	ask "scripts/upstream-sync ${BASH_REMATCH[1]} creates a branch and worktree (start) or commits the merge (finish)."
+fi
+exit 0

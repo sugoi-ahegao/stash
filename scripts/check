@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# One command that says whether this checkout is in a good state: what to run before calling
+# a change done.
+#
+#   generate     make generate, if the GraphQL schema or UI documents are newer than the
+#                generated code (or it's missing)
+#   go           gofmt (files the fork changed), go vet, golangci-lint (if installed; CI
+#                pins v2.11.4), go test with the Makefile's SQLite tags
+#   ui           biome lint, stylelint, tsc, biome format (pnpm validate, step by step)
+#   migrations   the fork's migration rules (scripts/upstream-sync check)
+#   docs         file:line references and links in the fork's docs (scripts/doc-refs)
+#   changelog    FORK_CHANGELOG.md is current (a warning only: it trails every commit)
+#
+# Every step runs even if an earlier one fails, and a summary comes last.
+#
+# Usage: scripts/check           everything (go test without integration tests)
+#        scripts/check --quick   only what the uncommitted changes touch
+#        scripts/check --it      also run the integration tests (slow; what CI runs)
+
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+TAGS="sqlite_stat4 sqlite_math_functions"
+LINT_VERSION=v2.11.4
+# go install puts binaries here, which isn't always on PATH
+PATH="$PATH:$(go env GOPATH)/bin"
+
+die() { echo "check: $*" >&2; exit 1; }
+info() { echo; echo "==> $*"; }
+
+quick=0
+for arg in "$@"; do
+	case "$arg" in
+	--quick) quick=1 ;;
+	--it) TAGS="$TAGS integration" ;;
+	-h | --help) sed -n '2,/^$/s/^# \{0,1\}//p' "$0"; exit 0 ;;
+	*) die "unknown argument '$arg' (run with --help)" ;;
+	esac
+done
+
+results=()
+record() { results+=("$(printf "%-16s %s" "$1" "$2")"); [[ "$2" != FAIL* ]]; }
+run() {
+	local name="$1"
+	shift
+	if "$@"; then record "$name" ok; else record "$name" FAIL; fi
+}
+
+# uncommitted changes, including new files
+changed() {
+	{ git diff --name-only --diff-filter=d HEAD; git ls-files --others --exclude-standard; } | sort -u
+}
+
+# --- generate --------------------------------------------------------------------------
+GENERATED=(internal/api/generated_exec.go internal/api/generated_models.go ui/v2.5/src/core/generated-graphql.ts)
+needs_generate() {
+	local file
+	for file in "${GENERATED[@]}"; do
+		[[ -f "$file" ]] || return 0
+		[[ -n "$(find graphql ui/v2.5/graphql gqlgen.yml -newer "$file" -name '*.graphql' -o -newer "$file" -name gqlgen.yml | head -n1)" ]] && return 0
+	done
+	return 1
+}
+info "generate"
+if needs_generate; then
+	run generate make generate
+else
+	echo "    up to date"
+	record generate ok
+fi
+
+# --- go --------------------------------------------------------------------------------
+go_files() {
+	if ((quick)); then changed | grep '\.go$' || true; else git ls-files '*.go'; fi |
+		grep -vE '^(internal/api/generated_|pkg/models/mocks/|pkg/stashbox/graphql/)' || true
+}
+go_packages() {
+	go_files | xargs -r -n1 dirname | sort -u | sed 's|^|./|'
+}
+# gofmt only what the fork touched: upstream's formatting is upstream's to fix
+fork_go_files() {
+	{ git diff --name-only --diff-filter=d "$(git merge-base HEAD upstream/develop)" -- '*.go'; changed; } |
+		grep '\.go$' | sort -u | grep -vE '^(internal/api/generated_|pkg/models/mocks/|pkg/stashbox/graphql/)' || true
+}
+
+info "go"
+packages="$(go_packages)"
+if [[ -z "$packages" ]]; then
+	echo "    no Go changes"
+	record go skipped
+else
+	((quick)) || packages="./..."
+	if ((quick)); then
+		unformatted="$(go_files | xargs -r gofmt -l)"
+	else
+		unformatted="$(fork_go_files | xargs -r gofmt -l)"
+	fi
+	if [[ -n "$unformatted" ]]; then
+		echo "    gofmt: run make fmt. Unformatted:"
+		sed 's/^/      /' <<<"$unformatted"
+		record gofmt FAIL
+	else
+		record gofmt ok
+	fi
+	# shellcheck disable=SC2086
+	run "go vet" go vet -tags "$TAGS" $packages
+	if command -v golangci-lint >/dev/null; then
+		if ((quick)); then
+			run golangci golangci-lint run --new-from-rev=HEAD
+		else
+			run golangci golangci-lint run
+		fi
+	else
+		echo "    golangci-lint not installed, skipped. CI runs it:"
+		echo "      go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$LINT_VERSION"
+		record golangci "skipped (not installed)"
+	fi
+	# shellcheck disable=SC2086
+	run "go test" go test -tags "$TAGS" $packages
+fi
+
+# --- ui --------------------------------------------------------------------------------
+info "ui"
+if ((quick)); then
+	if changed | grep -qE '^(ui/v2\.5/|graphql/)'; then
+		run ui make validate-ui-quick
+	else
+		echo "    no UI changes"
+		record ui skipped
+	fi
+else
+	# validate-ui's steps one at a time: it stops at the first failure, hiding the rest
+	for step in lint:js lint:css check format-check; do
+		run "ui $step" pnpm --dir ui/v2.5 run --silent "$step"
+	done
+fi
+
+# --- fork rules ------------------------------------------------------------------------
+info "migrations"
+run migrations scripts/upstream-sync check
+
+info "docs"
+run docs scripts/doc-refs
+
+info "changelog"
+if scripts/changelog --check; then
+	record changelog ok
+else
+	record changelog "warning: run scripts/changelog after committing"
+fi
+
+# --- summary ---------------------------------------------------------------------------
+echo
+echo "==> summary"
+failed=0
+for line in "${results[@]}"; do
+	echo "    $line"
+	[[ "$line" == *FAIL* ]] && failed=1
+done
+((failed == 0)) || die "some checks failed"

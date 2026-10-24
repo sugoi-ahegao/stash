@@ -3,7 +3,7 @@
 // stay free of consequence.
 //
 // A view is not a play: it never touches play count, play duration or resume
-// time. See docs/codebase/11-view-history.md.
+// time. See docs/decisions/0004-views-apart-from-plays.md.
 //
 // How long the cursor has to stay on the card before the view is recorded.
 // Long enough that sweeping the cursor across the grid on the way somewhere

@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Check that the docs still point at real code.
+#
+# Two kinds of reference are checked, in the fork's own docs (CLAUDE.md, FORK_CHANGELOG.md,
+# docs/codebase/, docs/decisions/, .claude/skills/, the fork migrations README). Upstream's
+# docs (README.md, docs/*.md) are left alone: fixing them would only conflict on merge.
+#
+#   `some/file.go:123`      the file exists and has at least that many lines. Partial paths
+#                           and bare names (`List/ItemList.tsx:29`, `scene.go:1013`) are
+#                           matched against the end of tracked paths, and checked when
+#                           exactly one file matches.
+#   [text](relative/path)   the link's target exists.
+#
+# And in code the fork changed, any docs/codebase/ or docs/decisions/ path in a comment
+# names a doc that exists.
+#
+# A line number that still exists can still have drifted to a different symbol; this only
+# catches references that point past the end of a file, or at nothing.
+#
+# Usage: scripts/doc-refs   (exits 1 if any reference is broken)
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+die() { echo "doc-refs: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+DOCS=(CLAUDE.md FORK_CHANGELOG.md docs/codebase docs/decisions .claude/skills pkg/sqlite/migrations_fork/README.md)
+
+broken=0
+report() { echo "    $1: $2"; broken=$((broken + 1)); }
+
+# the tracked file a reference names: prints it and succeeds, prints nothing and succeeds
+# if several files match (ambiguous, so unchecked), fails if none does
+resolve() {
+	local ref="$1" matches
+	[[ -f "$ref" ]] && { echo "$ref"; return; }
+	matches="$(git ls-files | grep -E "(^|/)${ref//./\\.}\$" || true)"
+	[[ -n "$matches" ]] || return 1
+	if [[ "$(wc -l <<<"$matches")" == 1 ]]; then echo "$matches"; fi
+}
+
+while IFS= read -r doc; do
+	# `file:line` and `file:line-line`
+	while IFS=: read -r lineno ref; do
+		file="${ref%%:*}"
+		line="${ref#*:}"
+		line="${line%%-*}"
+		[[ "$file" == path/to/* ]] && continue # an example, not a reference
+		if ! target="$(resolve "$file")"; then
+			report "$doc:$lineno" "\`$ref\` names a file that doesn't exist"
+			continue
+		fi
+		[[ -n "$target" ]] || continue
+		length="$(wc -l <"$target")"
+		((line <= length)) || report "$doc:$lineno" "\`$ref\` is past the end of $target ($length lines)"
+	done < <(grep -noE '`[A-Za-z0-9_./-]+\.[a-z]+:[0-9]+(-[0-9]+)?`' "$doc" | tr -d '`')
+
+	# relative markdown links
+	while IFS=: read -r lineno link; do
+		link="${link%%#*}"
+		[[ -n "$link" ]] || continue
+		[[ -e "$(dirname "$doc")/$link" ]] || report "$doc:$lineno" "link to $link, which doesn't exist"
+	done < <(grep -noE '\]\([^)[:space:]]+\)' "$doc" | sed -E 's/\]\((.*)\)$/\1/' | grep -vE '^[0-9]+:(https?|mailto):' || true)
+done < <(find "${DOCS[@]}" -name '*.md' 2>/dev/null | grep -v '^docs/readme_assets/')
+
+# code that points at the fork's docs, in the files the fork changed: the doc still exists
+base="$(git merge-base HEAD upstream/develop 2>/dev/null || echo HEAD)"
+while IFS=: read -r file lineno ref; do
+	[[ -f "$ref" ]] || report "$file:$lineno" "names $ref, which doesn't exist"
+done < <(git diff --name-only --diff-filter=d "$base" -- . ':!*.md' |
+	xargs -r grep -noE 'docs/(codebase|decisions)/[A-Za-z0-9_.-]+\.md' 2>/dev/null || true)
+
+((broken == 0)) || die "$broken broken doc reference(s)"
+info "Doc references resolve"

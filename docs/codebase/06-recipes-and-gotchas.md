@@ -167,6 +167,11 @@ the single write connection and blocks the entire application (doc 04).
 
 ## Validation before you push
 
+On this fork, `scripts/check` is the one command: generate if stale, gofmt, vet,
+golangci-lint, tests, `validate-ui`, the fork's migration rules and doc references, with
+a summary at the end. `--quick` checks only what's uncommitted, and `--it` adds the
+integration tests. The upstream targets it wraps:
+
 ```bash
 make validate          # everything: validate-ui + lint + it
 # or piecemeal:
