@@ -125,26 +125,17 @@ func (r *mutationResolver) SceneUpdate(ctx context.Context, input models.SceneUp
 		inputMap: getUpdateInputMap(ctx),
 	}
 
-	var newlyFeatured []int
+	featured := newFeaturedTracker(r) // fork
 
 	// Start the transaction and save the scene
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		var nowFeatured bool
-		ret, nowFeatured, err = r.sceneUpdate(ctx, input, translator)
-		if err != nil {
-			return err
-		}
-
-		if nowFeatured {
-			newlyFeatured = append(newlyFeatured, ret.ID)
-		}
-
-		return nil
+		ret, err = featured.sceneUpdate(ctx, input, translator)
+		return err
 	}); err != nil {
 		return nil, err
 	}
 
-	generateForFeatured(ctx, newlyFeatured)
+	featured.generate(ctx) // fork
 
 	r.hookExecutor.ExecutePostHooks(ctx, ret.ID, hook.SceneUpdatePost, input, translator.getFields())
 	return r.getScene(ctx, ret.ID)
@@ -153,7 +144,7 @@ func (r *mutationResolver) SceneUpdate(ctx context.Context, input models.SceneUp
 func (r *mutationResolver) ScenesUpdate(ctx context.Context, input []*models.SceneUpdateInput) (ret []*models.Scene, err error) {
 	inputMaps := getUpdateInputMaps(ctx)
 
-	var newlyFeatured []int
+	featured := newFeaturedTracker(r) // fork
 
 	// Start the transaction and save the scenes
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
@@ -162,13 +153,9 @@ func (r *mutationResolver) ScenesUpdate(ctx context.Context, input []*models.Sce
 				inputMap: inputMaps[i],
 			}
 
-			thisScene, nowFeatured, err := r.sceneUpdate(ctx, *scene, translator)
+			thisScene, err := featured.sceneUpdate(ctx, *scene, translator)
 			if err != nil {
 				return err
-			}
-
-			if nowFeatured {
-				newlyFeatured = append(newlyFeatured, thisScene.ID)
 			}
 
 			ret = append(ret, thisScene)
@@ -179,7 +166,7 @@ func (r *mutationResolver) ScenesUpdate(ctx context.Context, input []*models.Sce
 		return nil, err
 	}
 
-	generateForFeatured(ctx, newlyFeatured)
+	featured.generate(ctx) // fork
 
 	// execute post hooks outside of txn
 	var newRet []*models.Scene
@@ -268,43 +255,37 @@ func scenePartialFromInput(input models.SceneUpdateInput, translator changesetTr
 	return &updatedScene, nil
 }
 
-// returns the updated scene, and whether it was newly added to the featured group.
-func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUpdateInput, translator changesetTranslator) (*models.Scene, bool, error) {
+func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUpdateInput, translator changesetTranslator) (*models.Scene, error) {
 	sceneID, err := strconv.Atoi(input.ID)
 	if err != nil {
-		return nil, false, fmt.Errorf("converting id: %w", err)
+		return nil, fmt.Errorf("converting id: %w", err)
 	}
 
 	qb := r.repository.Scene
 
 	originalScene, err := qb.Find(ctx, sceneID)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	if originalScene == nil {
-		return nil, false, fmt.Errorf("scene with id %d not found", sceneID)
-	}
-
-	wasFeatured, err := sceneIsFeatured(ctx, qb, sceneID)
-	if err != nil {
-		return nil, false, err
+		return nil, fmt.Errorf("scene with id %d not found", sceneID)
 	}
 
 	// Populate scene from the input
 	updatedScene, err := scenePartialFromInput(input, translator)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	// ensure that title is set where scene has no file
 	if updatedScene.Title.Set && updatedScene.Title.Value == "" {
 		if err := originalScene.LoadFiles(ctx, r.repository.Scene); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		if len(originalScene.Files.List()) == 0 {
-			return nil, false, errors.New("title must be set if scene has no files")
+			return nil, errors.New("title must be set if scene has no files")
 		}
 	}
 
@@ -314,7 +295,7 @@ func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUp
 		// if file hash has changed, we should migrate generated files
 		// after commit
 		if err := originalScene.LoadFiles(ctx, r.repository.Scene); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		// ensure that new primary file is associated with scene
@@ -326,7 +307,7 @@ func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUp
 		}
 
 		if f == nil {
-			return nil, false, fmt.Errorf("file with id %d not associated with scene", newPrimaryFileID)
+			return nil, fmt.Errorf("file with id %d not associated with scene", newPrimaryFileID)
 		}
 	}
 
@@ -336,7 +317,7 @@ func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUp
 		var err error
 		coverImageData, err = utils.ProcessImageInput(ctx, *input.CoverImage)
 		if err != nil {
-			return nil, false, fmt.Errorf("processing cover image: %w", err)
+			return nil, fmt.Errorf("processing cover image: %w", err)
 		}
 	}
 
@@ -351,27 +332,22 @@ func (r *mutationResolver) sceneUpdate(ctx context.Context, input models.SceneUp
 
 	scene, err := qb.UpdatePartial(ctx, sceneID, *updatedScene)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	if coverImageIncluded {
 		if err := r.sceneUpdateCoverImage(ctx, scene, coverImageData); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 	}
 
 	if customFields != nil {
 		if err := qb.SetCustomFields(ctx, scene.ID, *customFields); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 	}
 
-	nowFeatured, err := r.applyFeaturedChange(ctx, scene.ID, wasFeatured)
-	if err != nil {
-		return nil, false, err
-	}
-
-	return scene, nowFeatured, nil
+	return scene, nil
 }
 
 func (r *mutationResolver) sceneUpdateCoverImage(ctx context.Context, s *models.Scene, coverImageData []byte) error {
@@ -448,18 +424,18 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 	}
 
 	ret := []*models.Scene{}
-	var newlyFeatured []int
+	featured := newFeaturedTracker(r) // fork
 
 	// Start the transaction and save the scenes
 	if err := r.withTxn(ctx, func(ctx context.Context) error {
 		qb := r.repository.Scene
 
-		for _, sceneID := range sceneIDs {
-			wasFeatured, err := sceneIsFeatured(ctx, qb, sceneID)
-			if err != nil {
-				return err
-			}
+		// fork
+		if err := featured.before(ctx, sceneIDs); err != nil {
+			return err
+		}
 
+		for _, sceneID := range sceneIDs {
 			scene, err := qb.UpdatePartial(ctx, sceneID, updatedScene)
 			if err != nil {
 				return err
@@ -471,24 +447,16 @@ func (r *mutationResolver) BulkSceneUpdate(ctx context.Context, input BulkSceneU
 				}
 			}
 
-			nowFeatured, err := r.applyFeaturedChange(ctx, scene.ID, wasFeatured)
-			if err != nil {
-				return err
-			}
-
-			if nowFeatured {
-				newlyFeatured = append(newlyFeatured, scene.ID)
-			}
-
 			ret = append(ret, scene)
 		}
 
-		return nil
+		// fork
+		return featured.after(ctx)
 	}); err != nil {
 		return nil, err
 	}
 
-	generateForFeatured(ctx, newlyFeatured)
+	featured.generate(ctx) // fork
 
 	// execute post hooks outside of txn
 	var newRet []*models.Scene
@@ -701,7 +669,7 @@ func (r *mutationResolver) SceneMerge(ctx context.Context, input SceneMergeInput
 			ScenePartial:       *values,
 			IncludePlayHistory: utils.IsTrue(input.PlayHistory),
 			IncludeOHistory:    utils.IsTrue(input.OHistory),
-			IncludeViewHistory: utils.IsTrue(input.ViewHistory),
+			IncludeViewHistory: utils.IsTrue(input.ViewHistory), // fork
 		}); err != nil {
 			return err
 		}
@@ -1229,85 +1197,6 @@ func (r *mutationResolver) SceneDeletePlay(ctx context.Context, id string, t []*
 		Count:   len(updatedTimes),
 		History: sliceutil.ValuesToPtrs(updatedTimes),
 	}, nil
-}
-
-// View history is recorded independently of play history and never touches
-// play_duration or resume_time.
-func (r *mutationResolver) SceneAddView(ctx context.Context, id string, t []*time.Time) (*HistoryMutationResult, error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, fmt.Errorf("converting id: %w", err)
-	}
-
-	var times []time.Time
-
-	// convert time to local time, so that sorting is consistent
-	for _, tt := range t {
-		times = append(times, tt.Local())
-	}
-
-	var updatedTimes []time.Time
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		updatedTimes, err = qb.AddViewed(ctx, sceneID, times)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return &HistoryMutationResult{
-		Count:   len(updatedTimes),
-		History: sliceutil.ValuesToPtrs(updatedTimes),
-	}, nil
-}
-
-func (r *mutationResolver) SceneDeleteView(ctx context.Context, id string, t []*time.Time) (*HistoryMutationResult, error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return nil, err
-	}
-
-	var times []time.Time
-
-	for _, tt := range t {
-		times = append(times, *tt)
-	}
-
-	var updatedTimes []time.Time
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		updatedTimes, err = qb.DeleteViewed(ctx, sceneID, times)
-		return err
-	}); err != nil {
-		return nil, err
-	}
-
-	return &HistoryMutationResult{
-		Count:   len(updatedTimes),
-		History: sliceutil.ValuesToPtrs(updatedTimes),
-	}, nil
-}
-
-func (r *mutationResolver) SceneResetViewCount(ctx context.Context, id string) (ret int, err error) {
-	sceneID, err := strconv.Atoi(id)
-	if err != nil {
-		return 0, err
-	}
-
-	if err := r.withTxn(ctx, func(ctx context.Context) error {
-		qb := r.repository.Scene
-
-		ret, err = qb.DeleteAllViewed(ctx, sceneID)
-		return err
-	}); err != nil {
-		return 0, err
-	}
-
-	return ret, nil
 }
 
 func (r *mutationResolver) SceneResetPlayCount(ctx context.Context, id string) (ret int, err error) {

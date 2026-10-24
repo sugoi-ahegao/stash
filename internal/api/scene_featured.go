@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -38,6 +39,87 @@ func sceneIsFeatured(ctx context.Context, l models.SceneGroupLoader, sceneID int
 	}
 
 	return false, nil
+}
+
+// featuredTracker follows scenes through an update transaction: it notes each
+// scene's featured group membership before the update, applies the featured
+// stamps after it, and collects the scenes that joined the group so they can
+// be generated for once the transaction has committed.
+//
+// It exists so the scene mutations in resolver_mutation_scene.go (an upstream
+// file) need only a few call sites changed.
+type featuredTracker struct {
+	r           *mutationResolver
+	wasFeatured map[int]bool
+	added       []int
+}
+
+func newFeaturedTracker(r *mutationResolver) *featuredTracker {
+	return &featuredTracker{
+		r:           r,
+		wasFeatured: make(map[int]bool),
+	}
+}
+
+// before records the featured membership of the scenes about to be updated.
+func (t *featuredTracker) before(ctx context.Context, sceneIDs []int) error {
+	for _, id := range sceneIDs {
+		was, err := sceneIsFeatured(ctx, t.r.repository.Scene, id)
+		if err != nil {
+			return err
+		}
+
+		t.wasFeatured[id] = was
+	}
+
+	return nil
+}
+
+// after applies featured changes to every scene passed to before. It must run
+// after the update's custom fields have been applied, see applyFeaturedChange.
+func (t *featuredTracker) after(ctx context.Context) error {
+	for id, was := range t.wasFeatured {
+		nowFeatured, err := t.r.applyFeaturedChange(ctx, id, was)
+		if err != nil {
+			return err
+		}
+
+		if nowFeatured {
+			t.added = append(t.added, id)
+		}
+	}
+
+	t.wasFeatured = make(map[int]bool)
+	return nil
+}
+
+// sceneUpdate is mutationResolver.sceneUpdate with featured tracking around it.
+func (t *featuredTracker) sceneUpdate(ctx context.Context, input models.SceneUpdateInput, translator changesetTranslator) (*models.Scene, error) {
+	sceneID, err := strconv.Atoi(input.ID)
+	if err != nil {
+		return nil, fmt.Errorf("converting id: %w", err)
+	}
+
+	if err := t.before(ctx, []int{sceneID}); err != nil {
+		return nil, err
+	}
+
+	scene, err := t.r.sceneUpdate(ctx, input, translator)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.after(ctx); err != nil {
+		return nil, err
+	}
+
+	return scene, nil
+}
+
+// generate queues generation for the scenes that joined the featured group.
+// Call it after the transaction has committed.
+func (t *featuredTracker) generate(ctx context.Context) {
+	generateForFeatured(ctx, t.added)
 }
 
 // applyFeaturedChange stamps or clears the featured custom fields for a scene
