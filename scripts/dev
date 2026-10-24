@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Development servers for the stash checkout you're standing in.
 #
-#   checkout with .local/   its own library and port, from .local/config.yml
-#                           (make server-start). The main checkout's is the dev library, :9998
-#   preview worktree        that preview's library and port (see scripts/preview), so a
-#                           branch runs against its copy and never against dev or production
+# Each checkout has its own library and port, from .local/config.yml (make server-start):
+# the main checkout's is the dev library on :9998, and each worktree gets its own copy
+# (scripts/worktree), so a branch never runs against dev or production.
 #
-# The UI is Vite, pointed at whichever backend belongs to this checkout. Its port is
-# STASH_UI_PORT in ui/v2.5/.env.development.local (written per checkout by
-# scripts/worktree), or Vite's 3000 where there's none, as in previews.
+# The UI is Vite, pointed at this checkout's backend. Its port is STASH_UI_PORT in
+# ui/v2.5/.env.development.local (written per checkout by scripts/worktree), or Vite's
+# 3000 where there's none.
 #
 # Usage: scripts/dev <server|ui|both>   (run with no arguments for help)
 
@@ -20,27 +19,17 @@ info() { echo "==> $*"; }
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not inside a git checkout ($PWD)"
 [[ -d "$ROOT/cmd/stash" ]] || die "$ROOT isn't a stash checkout"
 MAIN_CHECKOUT="$(git -C "$ROOT" worktree list --porcelain | sed -n '1s/^worktree //p')"
-PREVIEW_ROOT="${STASH_PREVIEW_ROOT:-$(dirname "$MAIN_CHECKOUT")/stash-previews}"
 
 port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 
-# what this checkout is, and the port its backend uses
-if [[ "$(dirname "$ROOT")" == "$PREVIEW_ROOT" ]]; then
-	KIND=preview
-	NAME="$(basename "$ROOT")"
-	DATA="$PREVIEW_ROOT/.data/$NAME"
-	[[ -f "$DATA/config.yml" ]] || die "preview $NAME has no library yet, run: scripts/preview up $NAME"
-	PORT="$(cat "$DATA/port")"
-elif [[ -f "$ROOT/.local/config.yml" ]]; then
-	KIND=local
-	PORT="$(sed -n 's/^port: *//p' "$ROOT/.local/config.yml")"
-	# a config copied from another checkout can still name that checkout's database
-	db="$(sed -n 's/^database: *//p' "$ROOT/.local/config.yml")"
-	[[ -z "$db" || "$db" != /* || "$db" == "$ROOT/"* ]] ||
-		die "$ROOT/.local/config.yml uses another checkout's database ($db); two servers would share one library"
-else
-	die "$ROOT has no library of its own (.local/config.yml). Make it a preview (scripts/preview new <branch>) or run this from $MAIN_CHECKOUT"
-fi
+# the port this checkout's backend uses
+[[ -f "$ROOT/.local/config.yml" ]] ||
+	die "$ROOT has no library of its own (.local/config.yml). Make worktrees with wt switch -c <branch>, or run this from $MAIN_CHECKOUT"
+PORT="$(sed -n 's/^port: *//p' "$ROOT/.local/config.yml")"
+# a config copied from another checkout can still name that checkout's database
+db="$(sed -n 's/^database: *//p' "$ROOT/.local/config.yml")"
+[[ -z "$db" || "$db" != /* || "$db" == "$ROOT/"* ]] ||
+	die "$ROOT/.local/config.yml uses another checkout's database ($db); two servers would share one library"
 [[ -n "$PORT" ]] || die "couldn't work out the backend port for $ROOT"
 [[ "$PORT" != 9999 ]] || die "this checkout's backend is configured for :9999, which is production's"
 
@@ -48,18 +37,9 @@ UI_PORT="$(sed -n 's/^STASH_UI_PORT=//p' "$ROOT/ui/v2.5/.env.development.local" 
 UI_PORT="${UI_PORT:-3000}"
 
 cmd_server() {
-	port_in_use "$PORT" && die "something is already on :$PORT$([[ $KIND == preview ]] && echo " (stop the preview with: scripts/preview down $NAME)")"
-
-	if [[ $KIND == local ]]; then
-		info "Backend on :$PORT ($ROOT/.local)"
-		exec make -C "$ROOT" server-start
-	fi
-
-	info "Building $NAME"
-	make -C "$ROOT" --no-print-directory stash
-	info "Preview $NAME backend on :$PORT ($DATA)"
-	cd "$DATA"
-	STASH_CONFIG_FILE="$DATA/config.yml" exec "$ROOT/stash"
+	port_in_use "$PORT" && die "something is already on :$PORT"
+	info "Backend on :$PORT ($ROOT/.local)"
+	exec make -C "$ROOT" server-start
 }
 
 cmd_ui() {
@@ -97,7 +77,7 @@ cmd_both() {
 
 usage() {
 	cat <<EOF
-Development servers for this checkout ($KIND: $ROOT, backend :$PORT).
+Development servers for this checkout ($ROOT, backend :$PORT).
 
   stash server   backend in the foreground. Ctrl-C and rerun after Go changes
   stash ui       Vite on :$UI_PORT, hot-reloading, talking to :$PORT
