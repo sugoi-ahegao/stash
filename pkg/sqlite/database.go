@@ -34,7 +34,7 @@ const (
 	cacheSizeEnv = "STASH_SQLITE_CACHE_SIZE"
 )
 
-var appSchemaVersion uint = 185
+var appSchemaVersion uint = 85
 
 //go:embed migrations/*.sql
 var migrationsBox embed.FS
@@ -89,6 +89,9 @@ type Database struct {
 	dbPath  string
 
 	schemaVersion uint
+
+	// fork: set by prepareForkMigrations, see fork_migrate.go
+	forkIsNew bool
 
 	lockChan chan struct{}
 }
@@ -149,6 +152,11 @@ func (db *Database) Open(dbPath string) error {
 	defer db.unlock()
 
 	db.dbPath = dbPath
+
+	// fork: see fork_migrate.go
+	if err := db.prepareForkMigrations(); err != nil {
+		return fmt.Errorf("preparing fork migrations: %w", err)
+	}
 
 	databaseSchemaVersion, err := db.getDatabaseSchemaVersion()
 	if err != nil {
@@ -262,6 +270,11 @@ func (db *Database) open(disableForeignKeys bool, writable bool) (*sqlx.DB, erro
 }
 
 func (db *Database) initialise() error {
+	// fork: see fork_migrate.go
+	if err := db.runForkMigrations(); err != nil {
+		return err
+	}
+
 	if err := db.openReadDB(); err != nil {
 		return fmt.Errorf("opening read database: %w", err)
 	}

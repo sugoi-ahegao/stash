@@ -2,13 +2,10 @@ package sqlite
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 
 	"github.com/golang-migrate/migrate/v4"
 	sqlite3mig "github.com/golang-migrate/migrate/v4/database/sqlite3"
-	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jmoiron/sqlx"
 	"github.com/stashapp/stash/pkg/logger"
@@ -22,7 +19,6 @@ type Migrator struct {
 	db   *Database
 	conn *sqlx.DB
 	m    *migrate.Migrate
-	src  source.Driver
 }
 
 func NewMigrator(db *Database) (*Migrator, error) {
@@ -68,50 +64,6 @@ func (m *Migrator) RequiredSchemaVersion() uint {
 	return appSchemaVersion
 }
 
-// NextSchemaVersion returns the version of the next migration to be run, or 0
-// if the database is already at the latest available version. Migration
-// versions are not necessarily contiguous, so the next version is not
-// necessarily the current version plus one.
-func (m *Migrator) NextSchemaVersion() uint {
-	current, _, _ := m.m.Version()
-	next, err := m.nextSchemaVersion(current)
-	if err != nil {
-		return 0
-	}
-
-	return next
-}
-
-func (m *Migrator) nextSchemaVersion(current uint) (uint, error) {
-	if current == 0 {
-		return m.src.First()
-	}
-
-	return m.src.Next(current)
-}
-
-// RemainingSchemaVersions returns the versions of the migrations that still
-// need to be run to bring the database up to the required schema version.
-func (m *Migrator) RemainingSchemaVersions() []uint {
-	var ret []uint
-
-	current, _, _ := m.m.Version()
-	for current < appSchemaVersion {
-		next, err := m.nextSchemaVersion(current)
-		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
-				logger.Errorf("Error determining migration version after %d: %v", current, err)
-			}
-			break
-		}
-
-		ret = append(ret, next)
-		current = next
-	}
-
-	return ret
-}
-
 func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 	migrations, err := iofs.New(migrationsBox, "migrations")
 	if err != nil {
@@ -122,8 +74,6 @@ func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	m.src = migrations
 
 	// use sqlite3Driver so that migration has access to durationToTinyInt
 	return migrate.NewWithInstance(
@@ -137,13 +87,8 @@ func (m *Migrator) getMigrate() (*migrate.Migrate, error) {
 func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 	databaseSchemaVersion, _, _ := m.m.Version()
 
-	expected, err := m.nextSchemaVersion(databaseSchemaVersion)
-	if err != nil {
-		return fmt.Errorf("determining migration version after %d: %w", databaseSchemaVersion, err)
-	}
-
-	if newVersion != expected {
-		return fmt.Errorf("invalid migration version %d, expected %d", newVersion, expected)
+	if newVersion != databaseSchemaVersion+1 {
+		return fmt.Errorf("invalid migration version %d, expected %d", newVersion, databaseSchemaVersion+1)
 	}
 
 	// run pre migrations as needed
@@ -151,7 +96,7 @@ func (m *Migrator) RunMigration(ctx context.Context, newVersion uint) error {
 		return fmt.Errorf("running pre migrations for schema version %d: %w", newVersion, err)
 	}
 
-	if err := m.m.Migrate(newVersion); err != nil {
+	if err := m.m.Steps(1); err != nil {
 		// migration failed
 		return err
 	}
@@ -232,12 +177,14 @@ func (db *Database) RunAllMigrations() error {
 	defer m.Close()
 
 	databaseSchemaVersion, _, _ := m.m.Version()
-	versions := m.RemainingSchemaVersions()
-	if len(versions) != 0 {
+	stepNumber := appSchemaVersion - databaseSchemaVersion
+	if stepNumber != 0 {
 		logger.Infof("Migrating database from version %d to %d", databaseSchemaVersion, appSchemaVersion)
 
 		// run each migration individually, and run custom migrations as needed
-		for _, newVersion := range versions {
+		var i uint = 1
+		for ; i <= stepNumber; i++ {
+			newVersion := databaseSchemaVersion + i
 			if err := m.RunMigration(ctx, newVersion); err != nil {
 				return err
 			}
