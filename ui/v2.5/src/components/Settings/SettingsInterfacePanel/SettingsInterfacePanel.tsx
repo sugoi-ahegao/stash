@@ -44,6 +44,7 @@ import {
 } from "src/utils/imageWall";
 import { defaultMaxOptionsShown, defaultPreviewVolume } from "src/core/config";
 import { PatchComponent } from "src/patch";
+import { ForkSettings } from "./ForkSettings";
 
 const allMenuItems = [
   { id: "scenes", headingID: "scenes" },
@@ -377,6 +378,8 @@ export const SettingsInterfacePanel: React.FC = PatchComponent(
             onChange={(v) => saveInterface({ showStudioAsText: v })}
           />
         </SettingSection>
+
+        <ForkSettings />
 
         <SettingSection headingID="config.ui.scene_player.heading">
           <BooleanSetting

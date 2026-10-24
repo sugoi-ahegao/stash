@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import cloneDeep from "lodash-es/cloneDeep";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useHistory, useLocation } from "react-router-dom";
@@ -17,6 +17,7 @@ import { GenerateDialog } from "../Dialogs/GenerateDialog";
 import { ExportDialog } from "../Shared/ExportDialog";
 import { SceneCardGrid } from "./SceneCardGrid";
 import { SceneCollectionPanel } from "./SceneCollectionPanel";
+import { useShowThumbnails } from "../List/ThumbnailToggle";
 import { TaggerContext } from "../Tagger/context";
 import { IdentifyDialog } from "../Dialogs/IdentifyDialog/IdentifyDialog";
 import { useConfigurationContext } from "src/hooks/Config";
@@ -186,10 +187,9 @@ const SceneList: React.FC<{
   selectedIds: Set<string>;
   onSelectChange: (id: string, selected: boolean, shiftKey: boolean) => void;
   fromGroupId?: string;
-  view?: View;
 }> = PatchComponent(
   "SceneList",
-  ({ scenes, filter, selectedIds, onSelectChange, fromGroupId, view }) => {
+  ({ scenes, filter, selectedIds, onSelectChange, fromGroupId }) => {
     const queue = useMemo(
       () => SceneQueue.fromListFilterModel(filter),
       [filter]
@@ -214,7 +214,6 @@ const SceneList: React.FC<{
           selectedIds={selectedIds}
           onSelectChange={onSelectChange}
           fromGroupId={fromGroupId}
-          view={view}
         />
       );
     }
@@ -250,7 +249,7 @@ const SceneList: React.FC<{
       );
     }
     if (filter.displayMode === DisplayMode.Collections) {
-      return <SceneCollectionPanel filter={filter} view={view} />;
+      return <SceneCollectionPanel filter={filter} />;
     }
 
     return null;
@@ -434,7 +433,7 @@ export const FilteredSceneList = PatchComponent(
 
     const { modal, showModal, closeModal } = modalState;
 
-    const [showThumbnails, setShowThumbnails] = useState(false);
+    const [showThumbnails, setShowThumbnails] = useShowThumbnails(view); // fork
 
     // Utility hooks
     const { setPage, removeCriterion, clearAllCriteria } = useFilterOperations({
@@ -741,7 +740,6 @@ export const FilteredSceneList = PatchComponent(
                     selectedIds={selectedIds}
                     onSelectChange={onSelectChange}
                     fromGroupId={fromGroupId}
-                    view={view}
                   />
                 </LoadedContent>
 

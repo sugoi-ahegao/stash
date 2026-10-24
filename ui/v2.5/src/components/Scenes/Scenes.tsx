@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet";
 import { useTitleProps } from "src/hooks/title";
 import { lazyComponent } from "src/utils/lazyComponent";
 import { View } from "../List/views";
+import { ViewOnHover } from "./sceneViews";
 
 const SceneList = lazyComponent(() => import("./SceneList"));
 const SceneMarkerList = lazyComponent(() => import("./SceneMarkerList"));
@@ -11,7 +12,12 @@ const Scene = lazyComponent(() => import("./SceneDetails/Scene"));
 const SceneCreate = lazyComponent(() => import("./SceneDetails/SceneCreate"));
 
 const Scenes: React.FC = () => {
-  return <SceneList view={View.Scenes} />;
+  // fork: the setting that records a view when the cursor rests on a card
+  return (
+    <ViewOnHover page="scenes">
+      <SceneList view={View.Scenes} />
+    </ViewOnHover>
+  );
 };
 
 const SceneMarkers: React.FC = () => {

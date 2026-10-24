@@ -12,6 +12,8 @@ interface IInterfaceQueryConfig {
 
 export interface IViewConfig {
   showSidebar?: boolean;
+  // fork: see components/List/ThumbnailToggle.tsx
+  showThumbnails?: boolean;
 }
 
 type IQueryConfig = Record<string, IInterfaceQueryConfig>;

@@ -11,12 +11,12 @@ import (
 	"github.com/stashapp/stash/pkg/models"
 )
 
-// The featured group drives the landing page carousel. These are kept in sync
-// with ui/v2.5/src/core/featured.ts - there's no config setting to choose the
-// featured group yet.
-const featuredGroupID = 25
-
 const (
+	// the UI config key holding the featured group's ID, chosen under Settings >
+	// Interface > This library. The UI reads the same key, see
+	// ui/v2.5/src/core/forkConfig.ts.
+	featuredGroupIDKey = "featuredGroupId"
+
 	// stamped on a scene when it's added to the featured group, so the
 	// carousel can see when that happened.
 	featuredAddedAtField = "featured_added_at"
@@ -25,8 +25,30 @@ const (
 	featureUnlockedAtField = "feature_unlocked_at"
 )
 
+// featuredGroupID returns the featured group's ID, or 0 if none is chosen, in
+// which case nothing is stamped or generated.
+func featuredGroupID() int {
+	v, ok := manager.GetInstance().Config.GetUIConfiguration()[featuredGroupIDKey]
+	if !ok {
+		return 0
+	}
+
+	// the UI saves IDs as strings, as GraphQL hands them out
+	s, ok := v.(string)
+	if !ok {
+		return 0
+	}
+
+	id, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+
+	return id
+}
+
 // sceneIsFeatured returns true if the scene is in the featured group.
-func sceneIsFeatured(ctx context.Context, l models.SceneGroupLoader, sceneID int) (bool, error) {
+func sceneIsFeatured(ctx context.Context, l models.SceneGroupLoader, sceneID int, featuredGroupID int) (bool, error) {
 	groups, err := l.GetGroups(ctx, sceneID)
 	if err != nil {
 		return false, err
@@ -50,6 +72,7 @@ func sceneIsFeatured(ctx context.Context, l models.SceneGroupLoader, sceneID int
 // file) need only a few call sites changed.
 type featuredTracker struct {
 	r           *mutationResolver
+	groupID     int
 	wasFeatured map[int]bool
 	added       []int
 }
@@ -57,14 +80,20 @@ type featuredTracker struct {
 func newFeaturedTracker(r *mutationResolver) *featuredTracker {
 	return &featuredTracker{
 		r:           r,
+		groupID:     featuredGroupID(),
 		wasFeatured: make(map[int]bool),
 	}
 }
 
 // before records the featured membership of the scenes about to be updated.
+// With no featured group chosen it records nothing, and after has nothing to do.
 func (t *featuredTracker) before(ctx context.Context, sceneIDs []int) error {
+	if t.groupID == 0 {
+		return nil
+	}
+
 	for _, id := range sceneIDs {
-		was, err := sceneIsFeatured(ctx, t.r.repository.Scene, id)
+		was, err := sceneIsFeatured(ctx, t.r.repository.Scene, id, t.groupID)
 		if err != nil {
 			return err
 		}
@@ -79,7 +108,7 @@ func (t *featuredTracker) before(ctx context.Context, sceneIDs []int) error {
 // after the update's custom fields have been applied, see applyFeaturedChange.
 func (t *featuredTracker) after(ctx context.Context) error {
 	for id, was := range t.wasFeatured {
-		nowFeatured, err := t.r.applyFeaturedChange(ctx, id, was)
+		nowFeatured, err := t.r.applyFeaturedChange(ctx, id, t.groupID, was)
 		if err != nil {
 			return err
 		}
@@ -130,10 +159,10 @@ func (t *featuredTracker) generate(ctx context.Context) {
 //
 // Must be called after any custom fields from the update input have been
 // applied, so that a full replacement doesn't wipe the stamp.
-func (r *mutationResolver) applyFeaturedChange(ctx context.Context, sceneID int, wasFeatured bool) (bool, error) {
+func (r *mutationResolver) applyFeaturedChange(ctx context.Context, sceneID int, featuredGroupID int, wasFeatured bool) (bool, error) {
 	qb := r.repository.Scene
 
-	isFeatured, err := sceneIsFeatured(ctx, qb, sceneID)
+	isFeatured, err := sceneIsFeatured(ctx, qb, sceneID, featuredGroupID)
 	if err != nil {
 		return false, err
 	}

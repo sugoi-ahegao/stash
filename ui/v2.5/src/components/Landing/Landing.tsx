@@ -5,6 +5,7 @@ import { DisplayMode } from "src/models/list-filter/types";
 import { lazyComponent } from "src/utils/lazyComponent";
 import { View } from "../List/views";
 import { FeaturedCarousel } from "./FeaturedCarousel";
+import { ViewOnHover } from "../Scenes/sceneViews";
 
 const SceneList = lazyComponent(() => import("../Scenes/SceneList"));
 
@@ -15,10 +16,12 @@ const Landing: React.FC = () => {
       <Helmet {...titleProps} />
       <FeaturedCarousel />
       {/* the landing list opens in Collections; the view remembers any other choice */}
-      <SceneList
-        view={View.Landing}
-        defaultDisplayMode={DisplayMode.Collections}
-      />
+      <ViewOnHover page="landing">
+        <SceneList
+          view={View.Landing}
+          defaultDisplayMode={DisplayMode.Collections}
+        />
+      </ViewOnHover>
     </div>
   );
 };

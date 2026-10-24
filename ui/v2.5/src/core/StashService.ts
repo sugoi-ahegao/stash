@@ -991,12 +991,7 @@ export const useSceneSaveActivity = () =>
     },
   });
 
-// evictLists controls whether cached scene lists are thrown away afterwards.
-// Callers that record a play from inside a visible list want to keep them:
-// evicting makes the list refetch, which pulls the grid out from under the
-// cursor. The cost is a list filtered or sorted by play count staying stale
-// until it's next fetched.
-export const useSceneIncrementPlayCount = (evictLists = true) =>
+export const useSceneIncrementPlayCount = () =>
   GQL.useSceneAddPlayMutation({
     update(cache, result, { variables }) {
       const mutationResult = result.data?.sceneAddPlay;
@@ -1031,11 +1026,9 @@ export const useSceneIncrementPlayCount = (evictLists = true) =>
         updateStats(cache, "scenes_played", 1);
       }
 
-      if (evictLists) {
-        evictQueries(cache, [
-          GQL.FindScenesDocument, // filter by play count
-        ]);
-      }
+      evictQueries(cache, [
+        GQL.FindScenesDocument, // filter by play count
+      ]);
     },
   });
 

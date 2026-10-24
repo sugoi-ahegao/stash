@@ -4,6 +4,7 @@ import {
   CollectionSortBy,
   DEFAULT_COLLECTION_SORT_BY,
   DEFAULT_COLLECTION_SORT_DIRECTION,
+  ICollectionRoots,
   collectionExtremes,
   collectionFilter,
   collectionNamesByFolderId,
@@ -13,11 +14,11 @@ import {
 } from "src/core/collections";
 import * as GQL from "src/core/generated-graphql";
 import { useConfigurationContext } from "src/hooks/Config";
+import { useForkConfig } from "src/core/forkConfig";
 import { ListFilterModel } from "src/models/list-filter/filter";
 import ScreenUtils from "src/utils/screen";
 import { Pagination, PaginationIndex } from "../List/Pagination";
 import { SortBySelect } from "../List/SortBySelect";
-import { View } from "../List/views";
 import { LoadingIndicator } from "../Shared/LoadingIndicator";
 import { SceneRecommendationRow } from "./SceneRecommendationRow";
 
@@ -33,9 +34,9 @@ import { SceneRecommendationRow } from "./SceneRecommendationRow";
 // one orders the rows themselves. See src/core/collections.ts.
 export const SceneCollectionPanel: React.FC<{
   filter: ListFilterModel;
-  view?: View;
-}> = ({ filter, view }) => {
+}> = ({ filter }) => {
   const { configuration } = useConfigurationContext();
+  const { collectionsFolder } = useForkConfig();
   const isTouch = ScreenUtils.isTouch();
 
   const [page, setPage] = useState(1);
@@ -57,26 +58,33 @@ export const SceneCollectionPanel: React.FC<{
     skip: !needsStats,
   });
 
-  const roots = useMemo(
-    () => (configuration?.general.stashes ?? []).map((s) => s.path),
-    [configuration?.general.stashes]
+  // undefined until an intake folder is set, and then there are no collections
+  const where = useMemo<ICollectionRoots | undefined>(
+    () =>
+      collectionsFolder
+        ? {
+            roots: (configuration?.general.stashes ?? []).map((s) => s.path),
+            intakeFolder: collectionsFolder,
+          }
+        : undefined,
+    [configuration?.general.stashes, collectionsFolder]
   );
 
   const folders = data?.findFolders.folders;
 
   const collections = useMemo(() => {
-    if (!folders || roots.length === 0) return [];
-    return toCollections(folders, roots);
-  }, [folders, roots]);
+    if (!folders || !where) return [];
+    return toCollections(folders, where);
+  }, [folders, where]);
 
   const extremes = useMemo(() => {
     const scenes = statsData?.findScenes.scenes;
-    if (!scenes || !folders) return new Map();
+    if (!scenes || !folders || !where) return new Map();
     return collectionExtremes(
       scenes,
-      collectionNamesByFolderId(folders, roots)
+      collectionNamesByFolderId(folders, where)
     );
-  }, [statsData?.findScenes.scenes, folders, roots]);
+  }, [statsData?.findScenes.scenes, folders, where]);
 
   const sorted = useMemo(
     () => sortCollections(collections, extremes, sortBy, sortDirection),
@@ -148,7 +156,6 @@ export const SceneCollectionPanel: React.FC<{
           isTouch={isTouch}
           filter={collectionFilter(collection, filter)}
           header={collection.name}
-          view={view}
         />
       ))}
 

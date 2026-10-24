@@ -20,11 +20,10 @@ import { useConfigurationContext } from "src/hooks/Config";
 import { PerformerPopoverButton } from "../Shared/PerformerPopoverButton";
 import { GridCard } from "../Shared/GridCard/GridCard";
 import { RatingBanner } from "../Shared/RatingBanner";
-import { FormattedMessage, useIntl } from "react-intl";
+import { FormattedMessage } from "react-intl";
 import {
   faBox,
   faCopy,
-  faEye,
   faFilm,
   faImages,
   faMapMarkerAlt,
@@ -38,13 +37,9 @@ import { GroupTag } from "../Groups/GroupTag";
 import { FileSize } from "../Shared/FileSize";
 import { OCounterButton } from "../Shared/CountButton";
 import { defaultPreviewVolume } from "src/core/config";
-import { goldenActivationDelay, isGolden } from "src/core/golden";
-import { hoverViewDelay } from "src/core/hoverView";
-import { SceneFire } from "./SceneFire";
-import { View } from "../List/views";
-import { useSceneAddView } from "src/core/StashService";
-import { useToast } from "src/hooks/Toast";
-import { viewedToday } from "src/core/viewed";
+import { useGoldenCard } from "./GoldenCard";
+import { MarkViewedButton } from "./MarkViewedButton";
+import { useDwellView } from "./sceneViews";
 
 interface IScenePreviewProps {
   isPortrait: boolean;
@@ -140,7 +135,6 @@ interface ISceneCardProps {
   zoomIndex?: number;
   onSelectedChanged?: (selected: boolean, shiftKey: boolean) => void;
   fromGroupId?: string;
-  view?: View;
 }
 
 const Description: React.FC<{
@@ -159,59 +153,6 @@ const Description: React.FC<{
     </>
   );
 };
-
-// One-click "I've seen this" for the card grid: stamps a VIEW at the current
-// time. Sits with the count buttons at the foot of the card.
-//
-// A view is not a play - it never touches play count or play duration.
-//
-// It lights up while the scene's last view falls on today, which needs no
-// local state: the mutation writes last_viewed_at into the cache, so the
-// button reads its own result back and stays lit until midnight.
-const MarkViewedButton: React.FC<{
-  sceneID: string;
-  lastViewedAt?: string | null;
-  disabled?: boolean;
-}> = PatchComponent(
-  "SceneCard.MarkViewedButton",
-  ({ sceneID, lastViewedAt, disabled }) => {
-    const intl = useIntl();
-    const Toast = useToast();
-
-    // no list eviction - refetching the list would replace the grid with a
-    // spinner and drop the card being clicked. See useSceneAddView.
-    const [addView] = useSceneAddView();
-
-    const viewedTodayNow = viewedToday(lastViewedAt);
-
-    async function onClick(event: React.MouseEvent) {
-      // the card behind the button navigates and selects
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (disabled) return;
-
-      try {
-        await addView({ variables: { id: sceneID } });
-      } catch (e) {
-        Toast.error(e);
-      }
-    }
-
-    return (
-      <Button
-        variant="secondary"
-        className={cx("minimal", "mark-viewed-button", {
-          "viewed-today": viewedTodayNow,
-        })}
-        title={intl.formatMessage({ id: "actions.add_view" })}
-        onClick={onClick}
-      >
-        <Icon icon={faEye} />
-      </Button>
-    );
-  }
-);
 
 const SceneCardPopovers = React.memo(
   PatchComponent("SceneCard.Popovers", (props: ISceneCardProps) => {
@@ -379,7 +320,7 @@ const SceneCardPopovers = React.memo(
       }
     }
 
-    // the mark-played button lives in this row and is always available, so
+    // the mark-viewed button lives in this row and is always available, so
     // the row itself is now unconditional on anything but compact cards -
     // it used to appear only when the scene had something to count.
     function maybeRenderPopoverButtonGroup() {
@@ -556,60 +497,10 @@ export const SceneCard = React.memo(
       return "";
     }
 
-    const golden = isGolden(props.scene);
-
-    // A golden card wakes up after a deliberate hover and then stays awake -
-    // the flames and the rim keep burning once they've been earned, rather
-    // than dying with the cursor. Hence a timer here instead of a CSS hover
-    // delay.
-    const [awake, setAwake] = useState(false);
-    const wakeTimer = useRef<ReturnType<typeof setTimeout>>();
-
-    // On the landing page, dwelling on a card records a view - the same thing
-    // opening the scene page does. Counted once per card: leaving and coming
-    // back to the same card doesn't view it again.
-    const hoverViews =
-      props.view === View.Landing && configuration?.ui?.trackActivity !== false;
-
-    // no list eviction: refetching the scene list would replace the grid with
-    // a spinner and drop the card the cursor is sitting on.
-    const [addView] = useSceneAddView();
-    const viewTimer = useRef<ReturnType<typeof setTimeout>>();
-    const viewed = useRef(false);
-
-    const onMouseEnter = useCallback(() => {
-      if (golden && !awake) {
-        wakeTimer.current = setTimeout(
-          () => setAwake(true),
-          goldenActivationDelay
-        );
-      }
-
-      if (hoverViews && !viewed.current) {
-        viewTimer.current = setTimeout(() => {
-          viewed.current = true;
-          addView({ variables: { id: props.scene.id } });
-        }, hoverViewDelay);
-      }
-    }, [golden, awake, hoverViews, addView, props.scene.id]);
-
-    const onMouseLeave = useCallback(() => {
-      clearTimeout(wakeTimer.current);
-      clearTimeout(viewTimer.current);
-    }, []);
-
-    useEffect(
-      () => () => {
-        clearTimeout(wakeTimer.current);
-        clearTimeout(viewTimer.current);
-      },
-      []
-    );
-
-    function goldenClass() {
-      if (!golden) return "";
-      return awake ? "golden awake" : "golden";
-    }
+    // fork: golden cards burn, and on some pages resting the cursor on a card
+    // records a view
+    const goldenCard = useGoldenCard(props.scene);
+    const dwellView = useDwellView(props.scene.id);
 
     const cont = configuration?.interface.continuePlaylistDefault ?? false;
 
@@ -622,7 +513,12 @@ export const SceneCard = React.memo(
 
     return (
       <GridCard
-        className={`scene-card ${zoomIndex()} ${filelessClass()} ${goldenClass()}`}
+        className={cx(
+          "scene-card",
+          zoomIndex(),
+          filelessClass(),
+          goldenCard.className
+        )}
         url={sceneLink}
         title={objectTitle(props.scene)}
         width={props.width}
@@ -642,9 +538,15 @@ export const SceneCard = React.memo(
         selected={props.selected}
         selecting={props.selecting}
         onSelectedChanged={props.onSelectedChanged}
-        onMouseEnter={golden || hoverViews ? onMouseEnter : undefined}
-        onMouseLeave={golden || hoverViews ? onMouseLeave : undefined}
-        decorations={golden ? <SceneFire /> : undefined}
+        onMouseEnter={() => {
+          goldenCard.onMouseEnter?.();
+          dwellView.onMouseEnter?.();
+        }}
+        onMouseLeave={() => {
+          goldenCard.onMouseLeave?.();
+          dwellView.onMouseLeave?.();
+        }}
+        decorations={goldenCard.decorations}
       />
     );
   })

@@ -8,9 +8,10 @@ import { LoadingIndicator } from "../Shared/LoadingIndicator";
 import { objectTitle } from "src/core/files";
 import {
   FEATURED_ADDED_AT_FIELD,
-  FEATURED_GROUP_ID,
   FEATURE_UNLOCKED_AT_FIELD,
+  withFeatured,
 } from "src/core/featured";
+import { useForkConfig } from "src/core/forkConfig";
 import {
   canUnlockMore,
   isUnlockExpired,
@@ -243,7 +244,17 @@ const FeaturedSlide: React.FC<{
   );
 };
 
+// Nothing to show until a featured group is chosen in the settings.
 export const FeaturedCarousel: React.FC = () => {
+  const { featuredGroupId } = useForkConfig();
+  if (!featuredGroupId) return null;
+
+  return <FeaturedGroupCarousel featuredGroupId={featuredGroupId} />;
+};
+
+const FeaturedGroupCarousel: React.FC<{ featuredGroupId: string }> = ({
+  featuredGroupId,
+}) => {
   const [activeIndex, setActiveIndex] = useState(0);
   // ids, not a count: the unlock budget drives which slides are shown, so we
   // need to know *which* scenes were unlocked in this session and not just
@@ -263,7 +274,7 @@ export const FeaturedCarousel: React.FC = () => {
       },
       scene_filter: {
         groups: {
-          value: [FEATURED_GROUP_ID],
+          value: [featuredGroupId],
           modifier: GQL.CriterionModifier.Includes,
         },
       },
@@ -369,12 +380,7 @@ export const FeaturedCarousel: React.FC = () => {
         variables: {
           input: {
             id: scene.id,
-            groups: scene.groups
-              .filter((g) => g.group.id !== FEATURED_GROUP_ID)
-              .map((g) => ({
-                group_id: g.group.id,
-                scene_index: g.scene_index,
-              })),
+            groups: withFeatured(scene, false, featuredGroupId),
             custom_fields: {
               remove: [FEATURED_ADDED_AT_FIELD, FEATURE_UNLOCKED_AT_FIELD],
             },
@@ -384,7 +390,7 @@ export const FeaturedCarousel: React.FC = () => {
         removedRef.current.delete(scene.id);
       });
     }
-  }, [consideredScenes, updateScene]);
+  }, [consideredScenes, updateScene, featuredGroupId]);
 
   if (loading) {
     return <LoadingIndicator />;

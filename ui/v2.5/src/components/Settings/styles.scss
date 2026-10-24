@@ -459,3 +459,13 @@
     position: static;
   }
 }
+
+// fork: the group and tag picker rows in ForkSettings.tsx. A setting's control
+// column is right-aligned and shrinks to fit, which leaves a picker showing a few
+// characters of the name; these keep it wide, left-aligned and on the card.
+#settings-container .setting.fork-select-setting > div:last-child {
+  flex-shrink: 0;
+  margin-left: 1rem;
+  text-align: left;
+  width: 20rem;
+}

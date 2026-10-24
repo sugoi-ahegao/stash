@@ -10,7 +10,7 @@ import { ListFilterModel } from "src/models/list-filter/filter";
 //
 //     /mnt/e/.../Stash Production / New / 2025-05-06
 //     └──────── library root ────┘ └─┬─┘ └─── the collection ───┘
-//                                    COLLECTIONS_FOLDER
+//                                 the intake folder
 //
 // Its name is usually a date the material was discovered ("2025-05-06"), but just as often
 // a release or pack name ("[EvilAngel] Gag Reflex 2"). Nothing is assumed about the name -
@@ -22,9 +22,9 @@ import { ListFilterModel } from "src/models/list-filter/filter";
 //
 // See docs/codebase/10-collections.md.
 
-// The intake folder inside each library root. Only its children become collections -
+// The intake folder is named in the collectionsFolder setting (src/core/forkConfig.ts):
+// one name, looked for inside each library root. Only its children become collections -
 // sibling areas hold material that has already been dealt with.
-export const COLLECTIONS_FOLDER = "New";
 
 // How many scene cards a collection row asks for, and the skeleton count while loading.
 export const CARDS_PER_ROW = 20;
@@ -65,16 +65,21 @@ function segmentsBelow(path: string, root: string): string[] | null {
   return null;
 }
 
-// Picks the collection folders out of every folder in the library and merges them by name.
-// `roots` are the configured library paths (configuration.general.stashes).
+// Where collections are found: the configured library paths
+// (configuration.general.stashes), and the intake folder inside each.
+export interface ICollectionRoots {
+  roots: readonly string[];
+  intakeFolder: string;
+}
+
 // Which collection a path belongs to, and how far below the root it sits. `depth` of 2 is
-// the collection folder itself (<root>/New/<name>); anything deeper is inside it.
-function collectionOf(path: string, roots: readonly string[]) {
+// the collection folder itself (<root>/<intake>/<name>); anything deeper is inside it.
+function collectionOf(path: string, { roots, intakeFolder }: ICollectionRoots) {
   for (const root of roots) {
     const segments = segmentsBelow(path, root);
     if (segments === null) continue;
 
-    if (segments.length < 2 || segments[0] !== COLLECTIONS_FOLDER) return null;
+    if (segments.length < 2 || segments[0] !== intakeFolder) return null;
 
     const name = segments[1];
     if (WINDOWS_PATH_NAME.test(name)) return null;
@@ -85,14 +90,15 @@ function collectionOf(path: string, roots: readonly string[]) {
   return null;
 }
 
+// Picks the collection folders out of every folder in the library and merges them by name.
 export function toCollections(
   folders: readonly ICollectionFolder[],
-  roots: readonly string[]
+  where: ICollectionRoots
 ): ICollection[] {
   const byName = new Map<string, ICollectionFolder[]>();
 
   for (const folder of folders) {
-    const found = collectionOf(folder.path, roots);
+    const found = collectionOf(folder.path, where);
     // the collection folder itself, not something inside it
     if (found === null || found.depth !== 2) continue;
 
@@ -115,12 +121,12 @@ export function toCollections(
 // fetch than the file's full path.
 export function collectionNamesByFolderId(
   folders: readonly ICollectionFolder[],
-  roots: readonly string[]
+  where: ICollectionRoots
 ) {
   const byFolderId = new Map<string, string>();
 
   for (const folder of folders) {
-    const found = collectionOf(folder.path, roots);
+    const found = collectionOf(folder.path, where);
     if (found !== null) {
       byFolderId.set(folder.id, found.name);
     }

@@ -117,6 +117,13 @@ export interface IUIConfig {
   taggerConfig?: ITaggerConfig;
 
   title?: string;
+
+  // fork: read through src/core/forkConfig.ts, not directly
+  featuredGroupId?: string;
+  goldenTagId?: string;
+  collectionsFolder?: string;
+  viewOnHoverLanding?: boolean;
+  viewOnHoverScenes?: boolean;
 }
 
 export function getFrontPageContent(

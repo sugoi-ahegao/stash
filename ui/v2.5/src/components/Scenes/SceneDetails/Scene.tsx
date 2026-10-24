@@ -20,7 +20,6 @@ import {
   queryFindScenes,
   queryFindScenesByID,
   useSceneIncrementPlayCount,
-  useSceneAddView,
 } from "src/core/StashService";
 
 import { SceneEditPanel } from "./SceneEditPanel";
@@ -35,6 +34,7 @@ import Mousetrap from "mousetrap";
 import { OrganizedButton } from "./OrganizedButton";
 import { GoldenButton } from "./GoldenButton";
 import { FeaturedButton } from "./FeaturedButton";
+import { useViewOnOpen } from "../sceneViews";
 import { useConfigurationContext } from "src/hooks/Config";
 import {
   getAbLoopPlugin,
@@ -61,8 +61,6 @@ import { SceneMergeModal } from "../SceneMergeDialog";
 import { goBackOrReplace } from "src/utils/history";
 import { FormattedDate } from "src/components/Shared/Date";
 import { StudioLogo } from "src/components/Shared/StudioLogo";
-import { isGolden, withGolden } from "src/core/golden";
-import { isFeatured, withFeatured } from "src/core/featured";
 import { JobFragment, useMonitorJob } from "src/utils/job";
 
 const SubmitStashBoxDraft = lazyComponent(
@@ -218,26 +216,9 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
     });
   }
 
-  // Opening the scene page records a VIEW, not a play - the player still owns
-  // play count and play duration exactly as upstream. Guarded by a ref so
-  // StrictMode's double-invoke records it once.
-  const [addView] = useSceneAddView();
-  const viewedSceneID = useRef<string>();
-  useEffect(() => {
-    if (configuration?.ui?.trackActivity === false) return;
-    if (viewedSceneID.current === scene.id) return;
-
-    viewedSceneID.current = scene.id;
-    addView({
-      variables: {
-        id: scene.id,
-      },
-    });
-  }, [scene.id, addView, configuration?.ui?.trackActivity]);
+  useViewOnOpen(scene.id); // fork
 
   const [organizedLoading, setOrganizedLoading] = useState(false);
-  const [goldenLoading, setGoldenLoading] = useState(false);
-  const [featuredLoading, setFeaturedLoading] = useState(false);
 
   const [activeTabKey, setActiveTabKey] = useState("scene-details-panel");
 
@@ -333,8 +314,6 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
   });
 
   async function onSave(input: GQL.SceneCreateInput) {
-    // adding the scene to the featured group stamps featured_added_at and
-    // kicks off generation - the server does this for every update path.
     await updateScene({
       variables: {
         input: {
@@ -343,7 +322,6 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
         },
       },
     });
-
     Toast.success(
       intl.formatMessage(
         { id: "toast.updated_entity" },
@@ -367,48 +345,6 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
       Toast.error(e);
     } finally {
       setOrganizedLoading(false);
-    }
-  };
-
-  const featured = isFeatured(scene);
-
-  // toggling the featured group is a plain scene update - the server stamps
-  // featured_added_at and kicks off generation when the scene joins.
-  const onFeaturedClick = async () => {
-    try {
-      setFeaturedLoading(true);
-      await updateScene({
-        variables: {
-          input: {
-            id: scene.id,
-            groups: withFeatured(scene, !featured),
-          },
-        },
-      });
-    } catch (e) {
-      Toast.error(e);
-    } finally {
-      setFeaturedLoading(false);
-    }
-  };
-
-  const golden = isGolden(scene);
-
-  const onGoldenClick = async () => {
-    try {
-      setGoldenLoading(true);
-      await updateScene({
-        variables: {
-          input: {
-            id: scene.id,
-            tag_ids: withGolden(scene, !golden),
-          },
-        },
-      });
-    } catch (e) {
-      Toast.error(e);
-    } finally {
-      setGoldenLoading(false);
     }
   };
 
@@ -796,16 +732,8 @@ const ScenePage: React.FC<IProps> = PatchComponent("ScenePage", (props) => {
                 clickToRate
                 withoutContext
               />
-              <GoldenButton
-                loading={goldenLoading}
-                golden={golden}
-                onClick={onGoldenClick}
-              />
-              <FeaturedButton
-                loading={featuredLoading}
-                featured={featured}
-                onClick={onFeaturedClick}
-              />
+              <GoldenButton scene={scene} />
+              <FeaturedButton scene={scene} />
             </span>
             <span className="scene-toolbar-group">
               <span>
