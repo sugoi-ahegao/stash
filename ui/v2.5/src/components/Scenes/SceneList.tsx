@@ -705,6 +705,7 @@ export const FilteredSceneList = PatchComponent(
                 />
 
                 <FilterTags
+                  view={view}
                   criteria={filter.criteria}
                   onEditCriterion={(c) =>
                     showEditFilter(c.criterionOption.type)
