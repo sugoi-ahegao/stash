@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+# Preview deployments for stash branches.
+#
+# Each preview is a git worktree plus a private copy of the library, served by its own
+# backend on its own port. Previews never write to the main library:
+#
+#   database    snapshotted with sqlite's online backup (safe while the main server runs)
+#   generated/  hard-linked copies. Stash writes generated files to a temp path and
+#   blobs/      renames them into place, and blobs are named by checksum, so a preview
+#               replacing or deleting a file only touches its own link.
+#   config.yml  copied, with absolute paths, its own port, and DLNA turned off
+#
+# Media libraries are shared and NOT protected: deleting a scene "with file" in a
+# preview deletes the real video.
+#
+# Usage: scripts/preview <command> [args]   (run with no arguments for help)
+
+set -euo pipefail
+
+MAIN_CHECKOUT="$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree //p')"
+SOURCE_DATA="${STASH_PREVIEW_SOURCE:-$MAIN_CHECKOUT/.local}"
+PREVIEW_ROOT="${STASH_PREVIEW_ROOT:-$(dirname "$MAIN_CHECKOUT")/stash-previews}"
+FIRST_PORT="${STASH_PREVIEW_FIRST_PORT:-10000}"
+
+die() { echo "preview: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+# idea/x -> idea-x
+slug() { echo "$1" | tr '/ ' '--' | tr -cd 'A-Za-z0-9._-'; }
+
+worktree_dir() { echo "$PREVIEW_ROOT/$(slug "$1")"; }
+data_dir() { echo "$PREVIEW_ROOT/.data/$(slug "$1")"; }
+
+require_preview() {
+	[[ -d "$(worktree_dir "$1")" ]] || die "no preview named '$1' (see: scripts/preview ls)"
+}
+
+is_running() {
+	local pidfile
+	pidfile="$(data_dir "$1")/stash.pid"
+	[[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile")" 2>/dev/null
+}
+
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+allocate_port() {
+	local port=$FIRST_PORT taken
+	taken="$(cat "$PREVIEW_ROOT"/.data/*/port 2>/dev/null || true)"
+	while grep -qx "$port" <<<"$taken" || port_in_use "$port"; do
+		port=$((port + 1))
+	done
+	echo "$port"
+}
+
+# set_key FILE KEY VALUE: replace a top-level yaml key, or append it if absent
+set_key() {
+	if grep -q "^$2:" "$1"; then
+		sed -i "s|^$2:.*|$2: $3|" "$1"
+	else
+		echo "$2: $3" >>"$1"
+	fi
+}
+
+# source_path KEY DEFAULT: a library path from the source config, made absolute
+source_path() {
+	local value
+	value="$(sed -n "s/^$1: *//p" "$SOURCE_DATA/config.yml")"
+	value="${value:-$2}"
+	[[ "$value" == /* ]] && echo "$value" || echo "$SOURCE_DATA/$value"
+}
+
+snapshot() {
+	local name=$1 data port
+	data="$(data_dir "$name")"
+	[[ -f "$SOURCE_DATA/config.yml" ]] || die "no config at $SOURCE_DATA/config.yml (set STASH_PREVIEW_SOURCE)"
+
+	info "Snapshotting library into $data"
+	rm -rf "$data"
+	mkdir -p "$data/cache"
+
+	# read-only, or closing the connection checkpoints the source's WAL into its main file
+	sqlite3 -readonly "$(source_path database stash-go.sqlite)" ".backup '$data/stash-go.sqlite'"
+
+	for dir in generated blobs; do
+		local src
+		[[ $dir == blobs ]] && src="$(source_path blobs_path blobs)" || src="$(source_path generated generated)"
+		[[ -d "$src" ]] || continue
+		cp -al "$src" "$data/$dir" 2>/dev/null || {
+			echo "    hard links unavailable for $dir, copying instead (slow)"
+			cp -a "$src" "$data/$dir"
+		}
+	done
+
+	port="$(allocate_port)"
+	echo "$port" >"$data/port"
+
+	cp "$SOURCE_DATA/config.yml" "$data/config.yml"
+	set_key "$data/config.yml" database "$data/stash-go.sqlite"
+	set_key "$data/config.yml" generated "$data/generated"
+	set_key "$data/config.yml" blobs_path "$data/blobs"
+	set_key "$data/config.yml" cache "$data/cache"
+	set_key "$data/config.yml" plugins_path "$(source_path plugins_path plugins)"
+	set_key "$data/config.yml" scrapers_path "$(source_path scrapers_path scrapers)"
+	set_key "$data/config.yml" port "$port"
+	set_key "$data/config.yml" nobrowser true
+	# the main server owns the DLNA port and the network's DLNA discovery
+	sed -i '/^dlna:/,/^[^ ]/ s/^\(    default_enabled:\).*/\1 false/' "$data/config.yml"
+}
+
+build() {
+	local name=$1 wt data head
+	wt="$(worktree_dir "$name")"
+	data="$(data_dir "$name")"
+	head="$(git -C "$wt" rev-parse HEAD)"
+
+	if [[ -x "$wt/stash" && "$(cat "$data/built-commit" 2>/dev/null)" == "$head" ]] &&
+		git -C "$wt" diff --quiet HEAD; then
+		info "Build is up to date with $(git -C "$wt" rev-parse --short HEAD)"
+		return
+	fi
+
+	info "Building $(git -C "$wt" rev-parse --short HEAD) (UI + server, takes a few minutes)"
+	[[ -d "$wt/ui/v2.5/node_modules" ]] || make -C "$wt" pre-ui
+	make -C "$wt" generate
+	make -C "$wt" ui
+	make -C "$wt" stash
+	echo "$head" >"$data/built-commit"
+}
+
+start() {
+	local name=$1 wt data port
+	wt="$(worktree_dir "$name")"
+	data="$(data_dir "$name")"
+	port="$(cat "$data/port")"
+
+	if is_running "$name"; then
+		info "Already running on http://localhost:$port"
+		return
+	fi
+	port_in_use "$port" && die "port $port is taken by something else"
+
+	info "Starting on port $port"
+	(
+		cd "$data"
+		STASH_CONFIG_FILE="$data/config.yml" nohup "$wt/stash" >"$data/stash.log" 2>&1 &
+		echo $! >"$data/stash.pid"
+	)
+
+	for _ in $(seq 60); do
+		port_in_use "$port" && break
+		is_running "$name" || die "server exited during startup, see: scripts/preview logs $name"
+		sleep 1
+	done
+	port_in_use "$port" || die "server did not open port $port within 60s, see: scripts/preview logs $name"
+
+	echo
+	echo "    $name  ->  http://localhost:$port"
+}
+
+stop() {
+	local name=$1 pidfile
+	pidfile="$(data_dir "$name")/stash.pid"
+	if is_running "$name"; then
+		info "Stopping $name"
+		kill "$(cat "$pidfile")"
+		for _ in $(seq 20); do is_running "$name" || break; sleep 0.5; done
+		is_running "$name" && kill -9 "$(cat "$pidfile")"
+	fi
+	rm -f "$pidfile"
+}
+
+cmd_new() {
+	local branch=${1:-} base=${2:-} wt
+	[[ -n "$branch" ]] || die "usage: scripts/preview new <branch> [base]"
+	wt="$(worktree_dir "$branch")"
+	[[ -e "$wt" ]] && die "$wt already exists"
+	mkdir -p "$PREVIEW_ROOT"
+
+	if git -C "$MAIN_CHECKOUT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
+		[[ -z "$base" ]] || die "branch '$branch' already exists, so a base makes no sense"
+		info "Checking out existing branch $branch"
+		git -C "$MAIN_CHECKOUT" worktree add "$wt" "$branch"
+	else
+		base="${base:-$(git -C "$MAIN_CHECKOUT" branch --show-current)}"
+		info "Creating branch $branch from $base"
+		git -C "$MAIN_CHECKOUT" worktree add -b "$branch" "$wt" "$base"
+	fi
+	mkdir -p "$wt/.local"
+
+	snapshot "$branch"
+	build "$branch"
+	start "$branch"
+}
+
+cmd_up() {
+	local name=${1:-}
+	[[ -n "$name" ]] || die "usage: scripts/preview up <name> [--fresh]"
+	require_preview "$name"
+	stop "$name"
+	if [[ "${2:-}" == --fresh || ! -f "$(data_dir "$name")/config.yml" ]]; then
+		snapshot "$name"
+	fi
+	build "$name"
+	start "$name"
+}
+
+cmd_down() {
+	[[ -n "${1:-}" ]] || die "usage: scripts/preview down <name>"
+	require_preview "$1"
+	stop "$1"
+}
+
+cmd_rm() {
+	local name=${1:-} wt
+	[[ -n "$name" ]] || die "usage: scripts/preview rm <name> [--force]"
+	require_preview "$name"
+	wt="$(worktree_dir "$name")"
+	if [[ "${2:-}" != --force ]] && [[ -n "$(git -C "$wt" status --porcelain)" ]]; then
+		die "$wt has uncommitted changes (rerun with --force to discard them)"
+	fi
+	stop "$name"
+	rm -rf "$(data_dir "$name")"
+	git -C "$MAIN_CHECKOUT" worktree remove --force "$wt"
+	info "Removed preview $name (its branch is kept; delete it with git branch -D)"
+}
+
+cmd_ls() {
+	local found=0
+	printf '%-28s %-28s %-9s %-7s %s\n' NAME BRANCH COMMIT STATUS URL
+	for wt in "$PREVIEW_ROOT"/*/; do
+		[[ -d "$wt" ]] || continue
+		found=1
+		local name status port
+		name="$(basename "$wt")"
+		port="$(cat "$(data_dir "$name")/port" 2>/dev/null || echo '?')"
+		is_running "$name" && status=up || status=down
+		printf '%-28s %-28s %-9s %-7s %s\n' "$name" \
+			"$(git -C "$wt" branch --show-current)" "$(git -C "$wt" rev-parse --short HEAD)" \
+			"$status" "http://localhost:$port"
+	done
+	[[ $found == 1 ]] || echo "(no previews; create one with: scripts/preview new <branch>)"
+}
+
+cmd_logs() {
+	[[ -n "${1:-}" ]] || die "usage: scripts/preview logs <name>"
+	require_preview "$1"
+	tail -n 100 -f "$(data_dir "$1")/stash.log"
+}
+
+cmd_dev() {
+	local name=${1:-}
+	[[ -n "$name" ]] || die "usage: scripts/preview dev <name>"
+	require_preview "$name"
+	is_running "$name" || die "start the backend first: scripts/preview up $name"
+	VITE_APP_PLATFORM_PORT="$(cat "$(data_dir "$name")/port")" make -C "$(worktree_dir "$name")" ui-start
+}
+
+usage() {
+	cat <<EOF
+Preview deployments: every branch gets its own stash server and its own copy of the library.
+
+  scripts/preview new <branch> [base]   create branch (from base, default: current branch),
+                                        snapshot the library, build, and start it
+  scripts/preview up <name> [--fresh]   rebuild if needed and (re)start; --fresh re-copies the
+                                        library from the main one, discarding preview changes
+  scripts/preview down <name>           stop the server
+  scripts/preview rm <name> [--force]   stop, delete its library copy and worktree (keeps branch)
+  scripts/preview ls                    list previews and their URLs
+  scripts/preview logs <name>           follow the server log
+  scripts/preview dev <name>            hot-reloading UI (vite) against that preview's server
+
+Worktrees live in $PREVIEW_ROOT/<name>; libraries in $PREVIEW_ROOT/.data/<name>.
+Copies are taken from $SOURCE_DATA (override with STASH_PREVIEW_SOURCE).
+EOF
+}
+
+command=${1:-help}
+shift || true
+case "$command" in
+new | up | down | rm | ls | logs | dev) "cmd_$command" "$@" ;;
+help | -h | --help) usage ;;
+*) die "unknown command '$command' (run with no arguments for help)" ;;
+esac

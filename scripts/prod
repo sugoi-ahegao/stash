@@ -1,0 +1,369 @@
+#!/usr/bin/env bash
+# Production stash: a native Windows stash.exe, shipped from this WSL checkout.
+#
+#   PRODUCTION  C:\Users\<you>\.stash      stash.exe, port 9999, DLNA on. The real library.
+#      ^  code only:  scripts/prod ship
+#   DEV         <main checkout>/.local     make server-start, port 9998, DLNA off
+#      v  data only:  scripts/prod pull-data
+#   PREVIEWS    scripts/preview            copied from DEV, ports 10000+
+#
+# Code goes up, data comes down; nothing done in development can touch the real library.
+#
+# .stash is stash's default config location, so stash.exe needs no arguments: it can be
+# started from a shortcut, the tray, or `stash` on the command line. The UI is served from
+# .stash\ui (ui_location), so a UI-only change ships by copying files, with no restart.
+#
+# Requires the mingw-w64 cross compiler: sudo apt install gcc-mingw-w64-x86-64
+
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel)"
+MAIN_CHECKOUT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+DEV_DATA="${STASH_DEV_DATA:-$MAIN_CHECKOUT/.local}"
+DEV_PORT=9998
+WIN_USER="${STASH_WINDOWS_USER:-$(cmd.exe /c 'echo %USERNAME%' 2>/dev/null | tr -d '\r')}"
+PROD="${STASH_PROD_HOME:-/mnt/c/Users/$WIN_USER/.stash}"
+EXE=stash.exe
+
+die() { echo "prod: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+winpath() { wslpath -w "$1"; }
+
+# run a PowerShell script on Windows; encoded, so no quoting survives the trip mangled
+ps() {
+	local script="\$ProgressPreference = 'SilentlyContinue'; $1"
+	powershell.exe -NoProfile -NonInteractive -EncodedCommand "$(iconv -f utf-8 -t utf-16le <<<"$script" | base64 -w0)" 2>/dev/null | tr -d '\r'
+}
+
+# dev_data_path KEY DEFAULT: a data path from the DEV config, made absolute
+dev_data_path() {
+	local value
+	value="$(sed -n "s/^$1: *//p" "$DEV_DATA/config.yml")"
+	value="${value:-$2}"
+	[[ "$value" == /* ]] && echo "$value" || echo "$DEV_DATA/$value"
+}
+
+# what makes DEV differ from production; everything else is copied from production
+DEV_OVERRIDES=(port=$DEV_PORT dlna.default_enabled=false parallel_tasks=1 nobrowser=true)
+
+is_running() { tasklist.exe /FI "IMAGENAME eq $EXE" 2>/dev/null | grep -qi "$EXE"; }
+prod_port() { sed -n 's/^port: *//p' "$PROD/config.yml"; }
+dev_running() { ss -ltn 2>/dev/null | grep -q ":$DEV_PORT "; }
+
+# convert_config SRC DST to-windows|to-linux DATA_DIR [key.path=yaml ...]
+#   Rewrites library roots between /mnt/d/... and D:\..., points the data paths into
+#   DATA_DIR, then applies the overrides.
+convert_config() {
+	python3 -I - "$@" <<-'PY'
+		import re, sys, yaml
+		src, dst, direction, data, *overrides = sys.argv[1:]
+
+		def to_windows(p):
+		    if re.match(r"[A-Za-z]:\\", p): return p
+		    m = re.fullmatch(r"/mnt/([a-z])/(.*)", p)
+		    if not m: sys.exit(f"library path is not on a Windows drive: {p}")
+		    return m[1].upper() + ":\\" + m[2].replace("/", "\\")
+
+		def to_linux(p):
+		    if p.startswith("/"): return p
+		    m = re.fullmatch(r"([A-Za-z]):[\\/](.*)", p)
+		    if not m: sys.exit(f"library path is not a drive path: {p}")
+		    return "/mnt/" + m[1].lower() + "/" + m[2].replace("\\", "/")
+
+		windows = direction == "to-windows"
+		sep = "\\" if windows else "/"
+		with open(src) as f:
+		    c = yaml.safe_load(f)
+
+		for lib in c.get("stash") or []:
+		    lib["path"] = (to_windows if windows else to_linux)(lib["path"])
+		for key, name in [("database", "stash-go.sqlite"), ("generated", "generated"),
+		                  ("blobs_path", "blobs"), ("cache", "cache"),
+		                  ("plugins_path", "plugins"), ("scrapers_path", "scrapers")]:
+		    c[key] = data + sep + name
+		for key in ("ui_location", "logfile"):
+		    c.pop(key, None)
+
+		for o in overrides:
+		    path, value = o.split("=", 1)
+		    *parents, leaf = path.split(".")
+		    node = c
+		    for p in parents:
+		        node = node.setdefault(p, {})
+		    node[leaf] = yaml.safe_load(value)
+
+		with open(dst, "w") as f:
+		    yaml.safe_dump(c, f, sort_keys=False, allow_unicode=True)
+	PY
+}
+
+# rewrite every folder path in a database: to-windows or to-linux
+convert_db_paths() {
+	local db=$1 leftover
+	if [[ $2 == to-windows ]]; then
+		sqlite3 "$db" "UPDATE folders SET path = upper(substr(path, 6, 1)) || ':\\' || replace(substr(path, 8), '/', '\\') WHERE path GLOB '/mnt/[a-z]/*';"
+		leftover="$(sqlite3 "$db" "select count(*) from folders where path like '/%'")"
+	else
+		sqlite3 "$db" "UPDATE folders SET path = '/mnt/' || lower(substr(path, 1, 1)) || '/' || replace(substr(path, 4), '\\', '/') WHERE path GLOB '[A-Za-z]:\\*';"
+		leftover="$(sqlite3 "$db" "select count(*) from folders where path not like '/%'")"
+	fi
+	[[ "$leftover" == 0 ]] || die "$leftover folder paths in $db could not be converted"
+	[[ "$(sqlite3 "$db" 'pragma integrity_check')" == ok ]] || die "$db failed its integrity check"
+}
+
+# files changed between the shipped commit and the working tree
+changed_since() {
+	{
+		git -C "$REPO" diff --name-only "$1" HEAD
+		git -C "$REPO" diff --name-only HEAD
+		git -C "$REPO" ls-files --others --exclude-standard
+	} | sort -u
+}
+
+build_ui() {
+	[[ -d "$REPO/ui/v2.5/node_modules" ]] || make -C "$REPO" pre-ui
+	make -C "$REPO" generate-ui ui
+}
+
+build_exe() {
+	command -v x86_64-w64-mingw32-gcc >/dev/null ||
+		die "missing cross compiler, run: sudo apt install gcc-mingw-w64-x86-64"
+	make -C "$REPO" generate-backend
+	make -C "$REPO" build-cc-windows
+}
+
+install_ui() {
+	mkdir -p "$PROD/ui"
+	# new hashed assets first, then the index.html that points at them, then prune
+	rsync -rt --exclude index.html "$REPO/ui/v2.5/build/" "$PROD/ui/"
+	cp "$REPO/ui/v2.5/build/index.html" "$PROD/ui/index.html"
+	rsync -rt --delete "$REPO/ui/v2.5/build/" "$PROD/ui/"
+}
+
+stop_prod() {
+	is_running || return 0
+	info "Stopping $EXE"
+	taskkill.exe /IM "$EXE" >/dev/null 2>&1 || true
+	for _ in $(seq 20); do is_running || return 0; sleep 0.5; done
+	taskkill.exe /F /IM "$EXE" >/dev/null
+	for _ in $(seq 20); do is_running || return 0; sleep 0.5; done
+	die "could not stop $EXE"
+}
+
+record_ship() {
+	local dirty=""
+	git -C "$REPO" diff --quiet HEAD || dirty=" (+ uncommitted changes)"
+	printf '%s %s%s\n' "$(git -C "$REPO" rev-parse HEAD)" "$(git -C "$REPO" branch --show-current)" "$dirty" >"$PROD/shipped"
+}
+
+cmd_ship() {
+	[[ -f "$PROD/config.yml" ]] || die "no production install yet, run: scripts/prod setup"
+	local mode=${1:-auto} shipped
+	shipped="$(cut -d' ' -f1 "$PROD/shipped" 2>/dev/null || true)"
+
+	if [[ $mode == auto ]]; then
+		mode=full
+		if [[ -n "$shipped" && -f "$PROD/$EXE" ]] && git -C "$REPO" cat-file -e "$shipped" 2>/dev/null; then
+			local changed
+			changed="$(changed_since "$shipped")"
+			if [[ -z "$changed" ]]; then
+				info "Production already runs $(git -C "$REPO" rev-parse --short HEAD), nothing to ship"
+				return
+			fi
+			grep -qv '^ui/v2.5/' <<<"$changed" || mode=--ui
+		fi
+	fi
+
+	info "Shipping $(git -C "$REPO" branch --show-current) @ $(git -C "$REPO" rev-parse --short HEAD) from $REPO"
+	case $mode in
+	--ui)
+		info "UI-only change: no restart needed"
+		build_ui
+		install_ui
+		;;
+	full | --full)
+		build_ui
+		build_exe
+		stop_prod
+		cp "$REPO/dist/stash-win.exe" "$PROD/$EXE"
+		install_ui
+		;;
+	*) die "usage: scripts/prod ship [--ui|--full]" ;;
+	esac
+	record_ship
+	is_running || cmd_start
+	info "Shipped. Reload http://localhost:$(prod_port)"
+}
+
+cmd_start() {
+	is_running && { info "$EXE is already running"; return; }
+	info "Starting $EXE"
+	ps "Start-Process -FilePath '$(winpath "$PROD")\\$EXE' -WorkingDirectory '$(winpath "$PROD")' -WindowStyle Hidden"
+	for _ in $(seq 30); do
+		ps "try { (Invoke-WebRequest -UseBasicParsing -TimeoutSec 1 http://localhost:$(prod_port)/healthz).StatusCode } catch { 0 }" | grep -q 200 && break
+		sleep 1
+	done
+	echo "    http://localhost:$(prod_port)   (TV / phone: http://<this PC's LAN IP>:$(prod_port))"
+}
+
+cmd_stop() {
+	is_running || { info "$EXE is not running"; return; }
+	stop_prod
+	info "Stopped"
+}
+
+cmd_status() {
+	[[ -f "$PROD/config.yml" ]] || { echo "No production install (run: scripts/prod setup)"; return; }
+	local shipped
+	shipped="$(cat "$PROD/shipped" 2>/dev/null || echo unknown)"
+	echo "Production  $(winpath "$PROD")"
+	echo "  running   $(is_running && echo "yes, http://localhost:$(prod_port)" || echo no)"
+	echo "  shipped   $(git -C "$REPO" log -1 --format='%h %s' "${shipped%% *}" 2>/dev/null || echo "$shipped")"
+	echo "            ${shipped#* }"
+	echo "Here        $(git -C "$REPO" branch --show-current) @ $(git -C "$REPO" log -1 --format='%h %s')"
+	if [[ "${shipped%% *}" != unknown ]] && git -C "$REPO" cat-file -e "${shipped%% *}" 2>/dev/null; then
+		local n
+		n="$(changed_since "${shipped%% *}" | wc -l)"
+		echo "            $n file(s) differ from production"
+	fi
+}
+
+cmd_logs() { tail -n 100 -f "$PROD/stash.log"; }
+
+# copy production's library into DEV, replacing DEV's data
+cmd_pull_data() {
+	[[ -f "$PROD/config.yml" ]] || die "no production install yet, run: scripts/prod setup"
+	dev_running && die "the dev server on port $DEV_PORT is running; stop it first"
+	mkdir -p "$DEV_DATA/cache"
+	local staged="$DEV_DATA/stash-go.sqlite.incoming"
+	rm -f "$staged"
+
+	if is_running; then
+		info "Asking production for a consistent database backup"
+		local before
+		before="$(date +%s)"
+		ps "Invoke-RestMethod -Method Post -ContentType 'application/json' -Uri http://localhost:$(prod_port)/graphql -Body '{\"query\":\"mutation { backupDatabase(input: {download: false}) }\"}' | Out-Null"
+		local backup
+		backup="$(ls -t "$PROD"/stash-go.sqlite.[0-9]* 2>/dev/null | head -1)"
+		[[ -n "$backup" && "$(stat -c %Y "$backup")" -ge "$before" ]] || die "production did not produce a backup"
+		mv "$backup" "$staged"
+	else
+		info "Production is stopped; copying its database"
+		cp "$PROD/stash-go.sqlite" "$staged"
+		[[ -f "$PROD/stash-go.sqlite-wal" ]] && cp "$PROD/stash-go.sqlite-wal" "$staged-wal"
+		sqlite3 "$staged" 'pragma wal_checkpoint(truncate)' >/dev/null
+		rm -f "$staged-wal" "$staged-shm"
+	fi
+	convert_db_paths "$staged" to-linux
+	rm -f "$DEV_DATA/stash-go.sqlite-wal" "$DEV_DATA/stash-go.sqlite-shm"
+	mv "$staged" "$DEV_DATA/stash-go.sqlite"
+
+	for dir in generated blobs plugins scrapers; do
+		[[ -d "$PROD/$dir" ]] || continue
+		info "Syncing $dir/"
+		rsync -rt --delete "$PROD/$dir/" "$DEV_DATA/$dir/"
+	done
+
+	convert_config "$PROD/config.yml" "$DEV_DATA/config.yml" to-linux "$DEV_DATA" "${DEV_OVERRIDES[@]}"
+	info "DEV now matches production. Start it with: make server-start"
+}
+
+# one-time: build, move the DEV library into production, and set DEV up beside it
+cmd_setup() {
+	[[ -f "$PROD/config.yml" ]] && die "$(winpath "$PROD") already has a library; refusing to overwrite it"
+	[[ -f "$DEV_DATA/config.yml" ]] || die "no library at $DEV_DATA to move into production"
+	is_running && die "$EXE is already running"
+	ss -ltnp 2>/dev/null | grep -q '"stash"' && die "a stash server is running in WSL; stop it first"
+
+	build_ui
+	build_exe
+
+	mkdir -p "$PROD/cache"
+	info "Copying database"
+	# read-only, or closing the connection checkpoints DEV's WAL into its main file
+	sqlite3 -readonly "$(dev_data_path database stash-go.sqlite)" ".backup '$PROD/stash-go.sqlite'"
+	convert_db_paths "$PROD/stash-go.sqlite" to-windows
+
+	for entry in generated:generated blobs:blobs_path plugins:plugins_path scrapers:scrapers_path; do
+		local dir=${entry%%:*} src
+		src="$(dev_data_path "${entry##*:}" "$dir")"
+		[[ -d "$src" ]] || continue
+		info "Copying $dir/ ($(du -sh "$src" | cut -f1))"
+		rsync -rt "$src/" "$PROD/$dir/"
+	done
+
+	info "Writing production config"
+	local win
+	win="$(winpath "$PROD")"
+	convert_config "$DEV_DATA/config.yml" "$PROD/config.yml" to-windows "$win" \
+		port=9999 dlna.default_enabled=true nobrowser=true \
+		"ui_location='$win\\ui'" "logfile='$win\\stash.log'"
+
+	cp "$REPO/dist/stash-win.exe" "$PROD/$EXE"
+	install_ui
+	record_ship
+
+	info "Switching DEV to port $DEV_PORT, DLNA off, one task at a time"
+	convert_config "$DEV_DATA/config.yml" "$DEV_DATA/config.yml" to-linux "$DEV_DATA" "${DEV_OVERRIDES[@]}"
+	# the dev UI runs in a Windows browser, where localhost:9999 is production
+	echo "VITE_APP_PLATFORM_PORT=$DEV_PORT" >"$MAIN_CHECKOUT/ui/v2.5/.env.development.local"
+
+	cmd_shortcuts
+	cmd_start
+}
+
+# Desktop + Start menu shortcuts, and `stash` on the PATH
+cmd_shortcuts() {
+	local win
+	win="$(winpath "$PROD")"
+	ps "
+		\$shell = New-Object -ComObject WScript.Shell
+		foreach (\$dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) {
+			\$s = \$shell.CreateShortcut((Join-Path \$dir 'Stash.lnk'))
+			\$s.TargetPath = '$win\\$EXE'
+			\$s.WorkingDirectory = '$win'
+			\$s.Save()
+		}
+		\$path = [Environment]::GetEnvironmentVariable('Path', 'User')
+		if ((\$path -split ';') -notcontains '$win') {
+			[Environment]::SetEnvironmentVariable('Path', ((\$path.TrimEnd(';'), '$win') -join ';'), 'User')
+		}"
+	info "Added Stash to the Desktop and Start menu, and $win to your PATH"
+}
+
+# start stash.exe at Windows login
+cmd_autostart() {
+	ps "
+		\$s = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Startup')) 'Stash.lnk'))
+		\$s.TargetPath = '$(winpath "$PROD")\\$EXE'
+		\$s.WorkingDirectory = '$(winpath "$PROD")'
+		\$s.Save()"
+	info "Stash will start when you log in to Windows"
+}
+
+usage() {
+	cat <<EOF
+Production stash: native Windows stash.exe in $PROD
+
+  scripts/prod setup            one-time: build, move the dev library into production,
+                                add shortcuts, and start it
+  scripts/prod ship [--ui|--full]
+                                ship this checkout to production. UI-only changes are
+                                copied in without a restart; anything else rebuilds
+                                stash.exe and restarts it
+  scripts/prod pull-data        replace the dev library with a copy of production's
+  scripts/prod status           what production runs, and how far this checkout differs
+  scripts/prod start|stop|logs
+  scripts/prod autostart        start production at Windows login
+EOF
+}
+
+command=${1:-help}
+shift || true
+case "$command" in
+setup | ship | start | stop | status | logs | shortcuts | autostart) "cmd_$command" "$@" ;;
+pull-data) cmd_pull_data "$@" ;;
+help | -h | --help) usage ;;
+*) die "unknown command '$command' (run with no arguments for help)" ;;
+esac

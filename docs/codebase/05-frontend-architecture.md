@@ -13,7 +13,8 @@ Routing is `react-router-dom` v5 (note: **v5**, so `Switch`/`component=`, not v6
   make pre-ui      pnpm install (once)
   make generate-ui regenerate src/core/generated-graphql.ts from the schema + documents
   make ui          production build → embedded into the Go binary
-  make ui-start    Vite dev server on :3000, proxying to a Stash server on :9999
+  make ui-start    Vite dev server on :3000, talking to the dev Stash server on :9998
+                   (upstream default :9999 is production on this machine - see doc 11)
   make validate-ui lint + typecheck + tests (biome + tsc)
   make fmt-ui      format
 ```
