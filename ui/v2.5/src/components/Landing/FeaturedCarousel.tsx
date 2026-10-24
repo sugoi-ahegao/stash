@@ -95,7 +95,8 @@ const SlideGlass: React.FC<{
   );
 };
 
-type FeaturedScene = GQL.FindFeaturedScenesQuery["findScenes"]["scenes"][number];
+type FeaturedScene =
+  GQL.FindFeaturedScenesQuery["findScenes"]["scenes"][number];
 
 // scenes without a recorded add date sort last; ISO strings compare
 // correctly with plain < / >.
@@ -143,7 +144,7 @@ const FeaturedSlide: React.FC<{
             },
           },
         },
-      }).catch(() => { });
+      }).catch(() => {});
     }, HOLD_DURATION_MS);
   }
 
@@ -173,7 +174,7 @@ const FeaturedSlide: React.FC<{
 
   useEffect(() => {
     if (showPreview) {
-      videoEl.current?.play()?.catch(() => { });
+      videoEl.current?.play()?.catch(() => {});
     } else {
       videoEl.current?.pause();
       if (videoEl.current) {
@@ -220,9 +221,7 @@ const FeaturedSlide: React.FC<{
           <div className="featured-slide-overlay" />
           <div className="featured-slide-info">
             {scene.studio && (
-              <div className="featured-slide-studio">
-                {scene.studio.name}
-              </div>
+              <div className="featured-slide-studio">{scene.studio.name}</div>
             )}
             <h2 className="featured-slide-title">{objectTitle(scene)}</h2>
             {scene.date && (

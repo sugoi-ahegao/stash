@@ -70,7 +70,7 @@ export class ListFilterModel {
     this.mode = mode;
     this.config = config;
     this.options = getFilterOptions(mode);
-    const { defaultSortBy, displayModeOptions } = this.options;
+    const { defaultSortBy } = this.options;
 
     if (options?.defaultSortBy) {
       this.sortBy = options.defaultSortBy;

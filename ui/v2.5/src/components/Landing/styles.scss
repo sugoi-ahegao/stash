@@ -10,6 +10,7 @@
   // hero slide's nested percentage widths, so revert to block layout here.
   .slick-track,
   .slick-slide {
+    // stylelint-disable-next-line declaration-no-important
     display: block !important;
   }
 
@@ -28,6 +29,7 @@
     align-items: center;
     background: rgba(0, 0, 0, 0.35);
     border-radius: 50%;
+    // stylelint-disable-next-line declaration-no-important
     display: flex !important;
     height: 40px;
     justify-content: center;
