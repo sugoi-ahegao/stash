@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import viteCompression from "vite-plugin-compression";
@@ -6,7 +6,11 @@ import viteCompression from "vite-plugin-compression";
 const sourcemap = process.env.VITE_APP_SOURCEMAPS === "true";
 
 // https://vitejs.dev/config/
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  // each checkout picks its own dev port in .env.development.local (scripts/worktree)
+  const devPort =
+    Number(loadEnv(mode, process.cwd(), "STASH_").STASH_UI_PORT) || 3000;
+
   const plugins = [
     react({
       babel: {
@@ -33,7 +37,8 @@ export default defineConfig(() => {
       entries: "src/index.tsx",
     },
     server: {
-      port: 3000,
+      port: devPort,
+      strictPort: true,
       cors: false,
     },
     publicDir: "public",

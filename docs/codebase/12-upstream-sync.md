@@ -62,7 +62,7 @@ else is in `fork_migrate.go`.
 
 ### Converting the old numbering
 
-Production, dev and every preview library are at 185 until they're opened by a build with
+Production, dev and every worktree's library are at 185 until they're opened by a build with
 this change. `prepareForkMigrations` converts them in place. It sets the fork version
 first, so a crash in between leaves 185 behind and the conversion runs again next time.
 Checked against a copy of the dev library: versions became 85 and 1, all 2,040 view
@@ -86,8 +86,8 @@ and that `appSchemaVersion` names upstream's last migration.
 ## Syncing, step by step
 
 ```
-  main checkout (clean)                     ~/projects/stash-previews/upstream-sync-<date>/
-  ─────────────────────                     ───────────────────────────────────────────────
+  main checkout (clean)                     ~/projects/stash.upstream-sync-<date>/
+  ─────────────────────                     ──────────────────────────────────────
   scripts/upstream-sync start  ──────────►  branch upstream-sync/<date>, from your branch
                                             git merge --no-commit upstream/develop
                                             generated files settled (below)
@@ -99,20 +99,22 @@ and that `appSchemaVersion` names upstream's last migration.
                                               go test (unit + integration) · commit
                                                 │
                                                 ▼
-                                            scripts/preview up upstream-sync-<date>
+                                            make server-start + make ui-start
                                               runs on a copy of the dev library. If upstream
                                               added a migration, the UI asks to migrate: do
                                               it, and click around
   git merge --ff-only upstream-sync/<date>  ◄───┘
   scripts/prod ship
   open production: if upstream added a migration, it's on the migrate page; click Migrate
-  scripts/preview rm upstream-sync-<date> && git branch -d upstream-sync/<date>
+  wt rm upstream-sync/<date>                (stop its server first; deletes the merged branch)
 ```
 
 The merge never happens in the main checkout, so a half-done sync never blocks other work.
-The worktree goes where `scripts/preview` keeps its own, which is why `preview up` can run
-it without a `preview new`. Previews copy the **dev** library, so run `scripts/prod
-pull-data` first if dev should match production before the migration test.
+The worktree goes where worktrunk puts its own and gets the same `scripts/worktree setup`
+(own ports, own library copy), so `make server-start` runs it and `wt ls`/`wt rm` know it.
+The copy is of the **dev** library, taken at `start`. To test against production's data,
+run `scripts/prod pull-data` in the main checkout, then `scripts/worktree refresh` in the
+sync worktree.
 
 The test step runs the integration suite with the Makefile's SQLite tags
 (`sqlite_stat4 sqlite_math_functions`). Without them, sorting tests fail with

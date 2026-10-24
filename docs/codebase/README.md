@@ -20,7 +20,7 @@ Read [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) first for build/run instructions
 | 08 | [Frontend component map](08-frontend-components.md) | You want to know what components exist, how they nest, and where to add a new one |
 | 09 | [Parallel experiments](09-parallel-experiments.md) | Superseded by 11 |
 | 10 | [Collections](10-collections.md) | You want to know how the Collections display mode groups scenes by their intake folder |
-| 11 | [Production, development and previews](11-production-and-dev.md) | You want to ship to the Windows production install, refresh dev data, or try a branch in an isolated preview |
+| 11 | [Production, development and worktrees](11-production-and-dev.md) | You want to ship to the Windows production install, refresh dev data, or try a branch in its own worktree (wt) with its own library and ports |
 | 12 | [Keeping up with upstream](12-upstream-sync.md) | You're merging upstream stash, adding a migration, or adding server code that has to survive upstream merges |
 
 Docs 05 and 08 are a pair: **05 is the frontend's frameworks** (list contexts, filter model,

@@ -1,0 +1,236 @@
+#!/usr/bin/env bash
+# Per-worktree dev environments, driven by worktrunk's hooks (.config/wt.toml).
+#
+# `wt switch -c <branch>` creates a worktree and runs `setup` in it, which gives it a
+# private copy of the dev library in its own .local/, exactly where `make server-start`
+# looks, and its own pair of ports:
+#
+#   production     9999                    scripts/prod
+#   main checkout  9998   dev UI 3998
+#   worktrees      9997, 9996, ...   dev UI 3997, 3996, ...   highest free pair below
+#
+# Nothing is started. Run `make server-start` and `make ui-start` in the worktree.
+#
+# What the copy shares with the main checkout:
+#   database    snapshotted with sqlite's online backup (safe while the dev server runs)
+#   generated/  hard-linked copies. Stash writes generated files to a temp path and
+#   blobs/      renames them into place, and blobs are named by checksum, so a worktree
+#               replacing or deleting a file only touches its own link.
+#   plugins, scrapers, media    shared. Deleting a scene "with file" deletes the real video.
+#
+# Usage: scripts/worktree <command> [args]   (run with no arguments for help)
+
+set -euo pipefail
+
+MAIN_CHECKOUT="$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree //p')"
+SOURCE_DATA="${STASH_WORKTREE_SOURCE:-$MAIN_CHECKOUT/.local}"
+TOP_SERVER_PORT=9997
+TOP_UI_PORT=3997
+LOWEST_SERVER_PORT=9900
+UI_ENV=ui/v2.5/.env.development.local
+
+die() { echo "worktree: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+all_worktrees() { git -C "$MAIN_CHECKOUT" worktree list --porcelain | sed -n 's/^worktree //p'; }
+
+server_port() { sed -n 's/^port: *//p' "$1/.local/config.yml" 2>/dev/null; }
+ui_port() { sed -n 's/^STASH_UI_PORT=//p' "$1/$UI_ENV" 2>/dev/null; }
+
+# the worktree containing the current directory, or the one given
+resolve() {
+	local dir
+	dir="$(git -C "${1:-.}" rev-parse --show-toplevel 2>/dev/null)" || die "${1:-.} is not in a worktree"
+	[[ "$dir" != "$MAIN_CHECKOUT" ]] || die "that's the main checkout; its .local comes from: scripts/prod pull-data"
+	echo "$dir"
+}
+
+# claimed_ports EXCLUDE: every port another checkout has written into its config
+claimed_ports() {
+	local wt
+	while read -r wt; do
+		[[ "$wt" == "$1" ]] && continue
+		server_port "$wt"
+		ui_port "$wt"
+	done < <(all_worktrees)
+}
+
+# allocate_offset WT: how far below the top ports this worktree's pair sits. Server and UI
+# move together (9997/3997, 9996/3996, ...) so either port identifies the worktree.
+allocate_offset() {
+	local offset=0 taken
+	taken="$(claimed_ports "$1")"
+	while :; do
+		local server=$((TOP_SERVER_PORT - offset)) ui=$((TOP_UI_PORT - offset))
+		((server >= LOWEST_SERVER_PORT)) || die "no free port pair left above $LOWEST_SERVER_PORT"
+		if ! grep -qxE "$server|$ui" <<<"$taken" && ! port_in_use "$server" && ! port_in_use "$ui"; then
+			echo "$offset"
+			return
+		fi
+		offset=$((offset + 1))
+	done
+}
+
+# set_key FILE KEY VALUE: replace a top-level yaml key, or append it if absent
+set_key() {
+	if grep -q "^$2:" "$1"; then
+		sed -i "s|^$2:.*|$2: $3|" "$1"
+	else
+		echo "$2: $3" >>"$1"
+	fi
+}
+
+# set_env FILE KEY VALUE: the same for a .env file
+set_env() {
+	touch "$1"
+	if grep -q "^$2=" "$1"; then
+		sed -i "s|^$2=.*|$2=$3|" "$1"
+	else
+		echo "$2=$3" >>"$1"
+	fi
+}
+
+# source_path KEY DEFAULT: a library path from the source config, made absolute
+source_path() {
+	local value
+	value="$(sed -n "s/^$1: *//p" "$SOURCE_DATA/config.yml")"
+	value="${value:-$2}"
+	[[ "$value" == /* ]] && echo "$value" || echo "$SOURCE_DATA/$value"
+}
+
+# snapshot WT PORT: replace WT/.local with a fresh copy of the source library
+snapshot() {
+	local wt=$1 port=$2 data
+	data="$wt/.local"
+	[[ -f "$SOURCE_DATA/config.yml" ]] || die "no config at $SOURCE_DATA/config.yml (run scripts/prod pull-data)"
+
+	info "Copying the dev library into $data"
+	rm -rf "$data"
+	mkdir -p "$data/cache"
+
+	# read-only, or closing the connection checkpoints the source's WAL into its main file
+	sqlite3 -readonly "$(source_path database stash-go.sqlite)" ".backup '$data/stash-go.sqlite'"
+
+	for dir in generated blobs; do
+		local src
+		[[ $dir == blobs ]] && src="$(source_path blobs_path blobs)" || src="$(source_path generated generated)"
+		[[ -d "$src" ]] || continue
+		cp -al "$src" "$data/$dir" 2>/dev/null || {
+			echo "    hard links unavailable for $dir, copying instead (slow)"
+			cp -a "$src" "$data/$dir"
+		}
+	done
+
+	cp "$SOURCE_DATA/config.yml" "$data/config.yml"
+	set_key "$data/config.yml" database "$data/stash-go.sqlite"
+	set_key "$data/config.yml" generated "$data/generated"
+	set_key "$data/config.yml" blobs_path "$data/blobs"
+	set_key "$data/config.yml" cache "$data/cache"
+	set_key "$data/config.yml" plugins_path "$(source_path plugins_path plugins)"
+	set_key "$data/config.yml" scrapers_path "$(source_path scrapers_path scrapers)"
+	set_key "$data/config.yml" port "$port"
+	set_key "$data/config.yml" nobrowser true
+	# production owns the DLNA port and the network's DLNA discovery
+	sed -i '/^dlna:/,/^[^ ]/ s/^\(    default_enabled:\).*/\1 false/' "$data/config.yml"
+}
+
+# write_ui_env WT SERVER UI: point the worktree's vite dev server at its own backend
+write_ui_env() {
+	set_env "$1/$UI_ENV" VITE_APP_PLATFORM_PORT "$2"
+	set_env "$1/$UI_ENV" STASH_UI_PORT "$3"
+}
+
+running() {
+	local wt=$1 port
+	for port in "$(server_port "$wt")" "$(ui_port "$wt")"; do
+		[[ -n "$port" ]] && port_in_use "$port" && return 0
+	done
+	return 1
+}
+
+cmd_setup() {
+	local wt offset server ui
+	wt="$(resolve "${1:-}")"
+	[[ ! -f "$wt/.local/config.yml" ]] || die "$wt is already set up (to re-copy the library: scripts/worktree refresh)"
+
+	offset="$(allocate_offset "$wt")"
+	server=$((TOP_SERVER_PORT - offset))
+	ui=$((TOP_UI_PORT - offset))
+
+	snapshot "$wt" "$server"
+	write_ui_env "$wt" "$server" "$ui"
+
+	echo
+	echo "    $(basename "$wt")  server :$server   dev UI :$ui"
+	echo "    start with: make server-start  and  make ui-start"
+}
+
+cmd_deps() {
+	local wt
+	wt="$(resolve "${1:-}")"
+	info "Installing UI dependencies"
+	make -C "$wt" pre-ui
+	info "Generating code"
+	make -C "$wt" generate
+	info "Ready"
+}
+
+cmd_refresh() {
+	local wt server
+	wt="$(resolve "${1:-}")"
+	server="$(server_port "$wt")"
+	[[ -n "$server" ]] || die "$wt isn't set up yet: scripts/worktree setup"
+	running "$wt" && die "stop its server and dev UI first"
+	snapshot "$wt" "$server"
+	info "Library re-copied; ports unchanged"
+}
+
+cmd_check_stopped() {
+	local wt
+	wt="$(resolve "${1:-}")"
+	if running "$wt"; then
+		die "$(basename "$wt") is still serving on :$(server_port "$wt")/:$(ui_port "$wt"); stop it before removing the worktree"
+	fi
+}
+
+cmd_ls() {
+	local wt
+	printf '%-36s %-32s %-7s %-7s %s\n' WORKTREE BRANCH SERVER UI STATUS
+	while read -r wt; do
+		local status=down
+		running "$wt" && status=up
+		printf '%-36s %-32s %-7s %-7s %s\n' "$(basename "$wt")" "$(git -C "$wt" branch --show-current)" \
+			"$(server_port "$wt" || true)" "$(ui_port "$wt" || true)" "$status"
+	done < <(all_worktrees)
+}
+
+usage() {
+	cat <<EOF
+Per-worktree dev environments. Worktrunk runs these for you:
+
+  wt switch -c <branch>        new worktree; runs setup, then deps in the background
+                               (progress: wt config state logs)
+  wt remove                    refuses while that worktree's server or dev UI is running
+
+Then, in the worktree:  make server-start   and   make ui-start
+
+  scripts/worktree ls          every checkout, its ports, and whether it's running
+  scripts/worktree refresh     re-copy the dev library, discarding this worktree's changes
+  scripts/worktree setup       ports + library copy (what the pre-start hook runs)
+  scripts/worktree deps        pnpm install + make generate (what the post-start hook runs)
+
+Commands act on the worktree containing the current directory, or on a path given after
+them. Libraries are copied from $SOURCE_DATA (override with STASH_WORKTREE_SOURCE).
+EOF
+}
+
+command=${1:-help}
+shift || true
+case "$command" in
+setup | deps | refresh | ls) "cmd_$command" "$@" ;;
+check-stopped) cmd_check_stopped "$@" ;;
+help | -h | --help) usage ;;
+*) die "unknown command '$command' (run with no arguments for help)" ;;
+esac

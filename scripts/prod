@@ -5,7 +5,7 @@
 #      ^  code only:  scripts/prod ship
 #   DEV         <main checkout>/.local     make server-start, port 9998, DLNA off
 #      v  data only:  scripts/prod pull-data
-#   PREVIEWS    scripts/preview            copied from DEV, ports 10000+
+#   WORKTREES   wt switch -c <branch>      copied from DEV, ports 9997, 9996, ... (scripts/worktree)
 #
 # Code goes up, data comes down; nothing done in development can touch the real library.
 #

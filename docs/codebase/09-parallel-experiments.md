@@ -3,12 +3,12 @@
 This doc described running several branches against **one shared library** in
 `stash/.local`, one backend at a time, on port 9999.
 
-That setup is gone. See **[11 — Production, development and previews](11-production-and-dev.md)**:
+That setup is gone. See **[11 — Production, development and worktrees](11-production-and-dev.md)**:
 
 - the real library is now a native Windows `stash.exe` (port 9999);
 - dev runs on its own copy (port 9998);
-- each branch gets a fully isolated preview (`scripts/preview`) with its own database,
-  so several backends can run at once.
+- each branch gets a fully isolated worktree (`wt switch -c`) with its own database and
+  ports, so several backends can run at once.
 
 ⚠️ Following the old instructions now would point a dev UI at port 9999, which is
 production.

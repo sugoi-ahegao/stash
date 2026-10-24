@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Merge upstream stash (stashapp/stash develop) into this fork.
 #
-# The merge happens in its own worktree, on a branch named upstream-sync/<date>, in the
-# place scripts/preview keeps its worktrees. So once it builds and its tests pass, the
-# same worktree runs as a preview against a copy of the library, and the main checkout
-# is never left half-merged:
+# The merge happens in its own worktree, on a branch named upstream-sync/<date>, set up
+# like one from `wt switch -c` (scripts/worktree): its own ports and copy of the library.
+# So once it builds and its tests pass, the same worktree runs with make server-start,
+# and the main checkout is never left half-merged:
 #
 #   start    branch + worktree, merge upstream/develop with --no-commit, settle the
 #            generated files. Stops for you to resolve any hand-written conflicts.
@@ -27,7 +27,6 @@
 set -euo pipefail
 
 MAIN_CHECKOUT="$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree //p')"
-PREVIEW_ROOT="${STASH_PREVIEW_ROOT:-$(dirname "$MAIN_CHECKOUT")/stash-previews}"
 UPSTREAM_URL=https://github.com/stashapp/stash.git
 UPSTREAM_REF=upstream/develop
 TEST_TAGS="sqlite_stat4 sqlite_math_functions"
@@ -178,16 +177,16 @@ cmd_start() {
 	base="$(git -C "$MAIN_CHECKOUT" branch --show-current)"
 	[[ -n "$base" ]] || die "the main checkout isn't on a branch"
 	branch="upstream-sync/$(date +%Y%m%d)"
-	wt="$PREVIEW_ROOT/$(slug "$branch")"
+	# where worktrunk puts it, so wt list/switch/remove see it as one of theirs
+	wt="$(dirname "$MAIN_CHECKOUT")/$(basename "$MAIN_CHECKOUT").$(slug "$branch")"
 	git -C "$MAIN_CHECKOUT" rev-parse -q --verify "refs/heads/$branch" >/dev/null &&
 		die "branch $branch already exists (finish it, or delete it and its worktree $wt)"
 	[[ $(git -C "$MAIN_CHECKOUT" rev-list --count "$base..$UPSTREAM_REF") != 0 ]] ||
 		die "$base already has everything in $UPSTREAM_REF"
 
 	info "Creating $branch from $base in $wt"
-	mkdir -p "$PREVIEW_ROOT"
 	git -C "$MAIN_CHECKOUT" worktree add --quiet -b "$branch" "$wt" "$base"
-	mkdir -p "$wt/.local"
+	"$MAIN_CHECKOUT/scripts/worktree" setup "$wt"
 	cd "$wt"
 
 	info "Merging $UPSTREAM_REF ($(git rev-parse --short "$UPSTREAM_REF"))"
@@ -246,19 +245,18 @@ cmd_finish() {
 	git commit --quiet --no-edit -m "Merge $UPSTREAM_REF ($(git rev-parse --short MERGE_HEAD)) into $(git branch --show-current)"
 	info "Merged and committed $(git rev-parse --short HEAD) on $(git branch --show-current)"
 
-	local name
-	name="$(slug "$(git branch --show-current)")"
 	cat <<EOF
 
 Next:
-  scripts/prod pull-data                   (optional: make the dev library match production)
-  scripts/preview up $name     run it on a copy of the dev library. If upstream added a
-                                           migration, the UI asks to migrate first: do it.
+  scripts/worktree refresh                 (optional, after scripts/prod pull-data in the main
+                                           checkout: re-copy the dev library)
+  make server-start  +  make ui-start      run it on its copy of the library. If upstream
+                                           added a migration, the UI asks to migrate: do it.
   then, in the main checkout:
   git merge --ff-only $(git branch --show-current)
   scripts/prod ship                        if upstream added a migration, production opens
                                            on the migrate page: click Migrate
-  scripts/preview rm $name && git branch -d $(git branch --show-current)
+  wt remove $(git branch --show-current)    (stop its server first)
 EOF
 }
 
@@ -273,7 +271,7 @@ Merge upstream stash into this fork, in a worktree of its own.
   scripts/upstream-sync finish   (in that worktree) regenerate, check, build, test, commit
   scripts/upstream-sync check    check the fork's migration rules in this checkout
 
-The worktree lives in $PREVIEW_ROOT, so scripts/preview can run it.
+The worktree is set up like one from wt switch -c: make server-start runs it.
 See docs/codebase/12-upstream-sync.md.
 EOF
 }

@@ -1,8 +1,9 @@
-# 11 — Production, development and previews
+# 11 — Production, development and worktrees
 
 How this fork is run day to day: the real library lives in a native Windows `stash.exe`,
-development happens in WSL against a copy of it, and branches get throwaway previews.
-Two scripts do all of it: `scripts/prod` and `scripts/preview`.
+development happens in WSL against a copy of it, and every branch gets a worktree with a
+copy of its own. `scripts/prod` runs production; worktrunk (`wt`) and `scripts/worktree`
+run the worktrees.
 
 ## The layout
 
@@ -17,11 +18,11 @@ Two scripts do all of it: `scripts/prod` and `scripts/preview`.
         │                                                     parallel_tasks 1
         │  data only     scripts/prod pull-data   (production ──► dev)
         ▼
-  PREVIEWS     ~/projects/stash-previews/<name>/  scripts/preview
-                                                              port 10000+ DLNA off
+  WORKTREES    ~/projects/stash.<branch>/.local/  wt switch -c <branch>
+                                                              port 9997…  DLNA off
 ```
 
-**Code goes up, data comes down.** Nothing done in dev or a preview can change the real
+**Code goes up, data comes down.** Nothing done in dev or a worktree can change the real
 library, and nothing ever copies dev data into production.
 
 The media files themselves (`D:`, `E:`, `F:`) are not copied anywhere. Every server reads
@@ -58,9 +59,8 @@ shortcut, and no dependency on a WSL terminal being open.
   ~/projects/stash/.local/         dev
     config.yml  stash-go.sqlite  generated/  blobs/  cache/
 
-  ~/projects/stash-previews/
-    <name>/                        git worktree for the preview's branch
-    .data/<name>/                  that preview's library copy, config, log, pid
+  ~/projects/stash.<branch>/       worktree (wt switch -c <branch>)
+    .local/                        its own copy: config.yml  stash-go.sqlite  generated/ …
 ```
 
 Each of the three has **its own database** and **its own `generated/` and `blobs/`**.
@@ -96,8 +96,9 @@ setting changed only in dev is lost on the next pull.
 ⚠️ **The dev UI must not talk to port 9999.** The vite dev server runs in a Windows
 browser, where `localhost:9999` *is production*. `ui/v2.5/.env.development.local`
 (gitignored) sets `VITE_APP_PLATFORM_PORT=9998` in the main checkout, and
-`scripts/preview dev` passes each preview's port explicitly. A new worktree created by hand
-has neither, and its dev UI would edit the real library.
+`scripts/worktree setup` writes each worktree's own. A worktree made with plain
+`git worktree add` has none, and its dev UI would edit the real library: make worktrees
+with `wt switch -c`, or run `scripts/worktree setup` in one made by hand.
 
 ## Paths are stored per host
 
@@ -171,11 +172,11 @@ An older binary refuses a newer schema of either kind: upstream's at
 `pkg/sqlite/database.go:168`, the fork's with `MismatchedForkSchemaVersionError`. So shipping
 a branch with a migration and then shipping one without it leaves production unable to
 start until that backup is restored. **Ship migrations deliberately, from the main
-branch, never from an experiment.** Test them in a preview first: previews have their own
+branch, never from an experiment.** Test them in a worktree first: worktrees have their own
 database copy, so a migration there touches nothing else.
 
 Upstream migrations arrive through `scripts/upstream-sync` (doc 12). That merges and tests
-in a preview-ready worktree, so the migrate page is something you've already clicked
+in a worktree set up like any other, so the migrate page is something you've already clicked
 through on a copy before production shows it.
 
 ## Pulling data into dev
@@ -196,24 +197,57 @@ through a shared-memory file (`-shm`), which doesn't work across the 9P bridge. 
 read-only `sqlite3` fails with `disk I/O error` while `stash.exe` runs. Ask production for a
 backup instead, as `pull-data` does.
 
-## Previews
+## Worktrees
 
-One per branch, each fully isolated: its own worktree, its own server process and port,
-and its own copy of the **dev** library.
+Every branch gets its own worktree from [worktrunk](https://worktrunk.dev), and every
+worktree gets its own copy of the **dev** library and its own ports. The hooks in
+`.config/wt.toml` call `scripts/worktree`.
 
 ```bash
-scripts/preview new idea/x            # branch from the current branch, snapshot, build, start
-scripts/preview new idea/x develop    # ...branching from develop instead
-scripts/preview ls                    # previews, branches, status, URLs
-scripts/preview dev idea-x            # hot-reloading UI against that preview's server
-scripts/preview up idea-x             # rebuild if the code changed, restart
-scripts/preview up idea-x --fresh     # also re-copy the library, discarding preview changes
-scripts/preview logs idea-x
-scripts/preview down idea-x           # stop
-scripts/preview rm idea-x             # stop, delete worktree + library copy (keeps the branch)
+wt sw -c idea/x            # (wt switch --create) branch from main-sugoi-ahegao, set up, cd in
+make server-start          # backend on this worktree's port
+make ui-start              # vite on this worktree's UI port, talking to that backend
+scripts/worktree ls        # every checkout, its ports, up/down
+scripts/worktree refresh   # re-copy the dev library, discarding this worktree's changes
+wt ls                      # (wt list)
+wt rm idea/x               # (wt remove) refuses while its server or dev UI is running
 ```
 
-Names are the branch with `/` turned into `-`. A first build takes about 1.5 minutes.
+`ls`, `sw` and `rm` are aliases in `~/.config/worktrunk/config.toml`. Worktrunk's default
+branch is set to `main-sugoi-ahegao` (`wt config state default-branch set`), so new
+branches start from the fork, not upstream's `develop`.
+
+`wt switch -c` starts nothing. What runs when:
+
+```
+  pre-start   (blocks, ~5 s)   scripts/worktree setup
+                                 picks the highest free port pair below the main checkout's
+                                 copies the dev library into <worktree>/.local/
+                                 writes ui/v2.5/.env.development.local
+  post-start  (background)     scripts/worktree deps
+                                 pnpm install + make generate, about 2 minutes.
+                                 Progress: wt config state logs. make server-start
+                                 fails until it's done (missing generated_*.go).
+  pre-remove  (blocks)         scripts/worktree check-stopped
+```
+
+Ports:
+
+| checkout | server | dev UI |
+|---|---|---|
+| production | 9999 | — |
+| main checkout | 9998 | 3998 |
+| worktrees | 9997, 9996, … | 3997, 3996, … |
+
+The two move together, so either one tells you which worktree it is. A pair is free when
+no other worktree's config claims it and nothing is listening on it. Ports come back to the
+pool when their worktree is removed. The server port is `port:` in `.local/config.yml`.
+The UI port is `STASH_UI_PORT` in `.env.development.local`, which `vite.config.js` reads
+(`strictPort`, so a taken port fails loudly instead of drifting to the next one).
+
+Worktrees live beside the main checkout, at `~/projects/stash.<branch>` (`/` becomes `-`).
+The hooks run the main checkout's `scripts/worktree`, so branches made before the script
+existed still get it.
 
 How the copy is made, and why it's safe:
 
@@ -223,32 +257,29 @@ How the copy is made, and why it's safe:
   generated/   cp -al  hard links: instant, no extra disk. Safe because stash writes
   blobs/               generated files to a temp path and renames them into place
                        (pkg/scene/generate/generator.go:100), and blobs are named by
-                       checksum. A preview replacing or deleting a file only affects
+                       checksum. A worktree replacing or deleting a file only affects
                        its own link.
   config.yml   copied, with absolute paths, its own port, DLNA off
 ```
 
-Two previews running together were checked to be isolated: a tag created in one appeared
-in neither the other nor the dev library.
-
-⚠️ **Media is shared and unprotected.** Deleting a scene *with its file* in a preview or
+⚠️ **Media is shared and unprotected.** Deleting a scene *with its file* in a worktree or
 in dev deletes the real video.
 
-To try a preview's code on the real library, ship from its worktree:
-`cd ~/projects/stash-previews/idea-x && ~/projects/stash/scripts/prod ship`. `scripts/prod`
+To try a worktree's code on the real library, ship from it:
+`cd ~/projects/stash.idea-x && ~/projects/stash/scripts/prod ship`. `scripts/prod`
 ships whichever checkout it's run from (`git rev-parse --show-toplevel`), so the main
 checkout's copy works even if the branch doesn't have the script. Mind the migration rule
 above.
 
 ## Squashing
 
-Work on a branch (a preview makes that cheap), then fold it into the main branch as one
+Work on a branch (a worktree makes that cheap), then fold it into the main branch as one
 commit:
 
 ```bash
 git checkout main-sugoi-ahegao
 git merge --squash idea/x && git commit
-scripts/preview rm idea-x && git branch -D idea/x
+wt rm -D idea/x               # -D: the squashed branch looks unmerged
 ```
 
 Or open a PR on the fork and use GitHub's "Squash and merge".
@@ -275,12 +306,12 @@ NordVPN's "Invisibility on LAN".
 
 | Task | Command |
 |---|---|
-| Develop | `make server-start` + `make ui-start` (dev, port 9998) |
+| Develop | `stash server` + `stash ui` in any checkout (`scripts/dev`; main checkout: backend 9998, UI 3998) |
 | Ship to production | `scripts/prod ship` |
 | What's in production | `scripts/prod status` |
 | Refresh dev from production | `scripts/prod pull-data` |
 | Start / stop production | Stash shortcut or tray icon, or `scripts/prod start` / `stop` |
 | Production log | `scripts/prod logs` |
-| Try a branch | `scripts/preview new <branch>` |
-| List / remove previews | `scripts/preview ls` / `scripts/preview rm <name>` |
+| Try a branch | `wt sw -c <branch>`, then `make server-start` + `make ui-start` |
+| List / remove worktrees | `scripts/worktree ls` (ports) or `wt ls` / `wt rm <branch>` |
 | Merge upstream stash | `scripts/upstream-sync start`, then `finish` in its worktree (doc 12) |
