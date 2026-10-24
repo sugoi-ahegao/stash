@@ -1,0 +1,287 @@
+#!/usr/bin/env bash
+# Merge upstream stash (stashapp/stash develop) into this fork.
+#
+# The merge happens in its own worktree, on a branch named upstream-sync/<date>, in the
+# place scripts/preview keeps its worktrees. So once it builds and its tests pass, the
+# same worktree runs as a preview against a copy of the library, and the main checkout
+# is never left half-merged:
+#
+#   start    branch + worktree, merge upstream/develop with --no-commit, settle the
+#            generated files. Stops for you to resolve any hand-written conflicts.
+#   finish   regenerate, check the fork's migration rules, build, test, commit the merge
+#   check    the fork's migration rules on their own (runs in any checkout)
+#   status   how far behind upstream this branch is, and what's waiting
+#
+# Generated files are never merged by hand:
+#   pkg/models/mocks/               regenerated (mockery)
+#   internal/api/loaders/*_gen.go   upstream's side on a conflict. Not regenerated: dataloaden's
+#                                   output for time.Time loaders needs a hand fix (it imports
+#                                   time twice), so the committed files aren't pure output.
+#                                   The fork's loaders are files of their own, so conflicts
+#                                   only come from upstream changing a loader it owns.
+#   pkg/stashbox/graphql/           upstream's copy, always. It's generated from stashdb.org's
+#                                   live schema, so regenerating it here only adds churn.
+#
+# Usage: scripts/upstream-sync <command>   (run with no arguments for help)
+
+set -euo pipefail
+
+MAIN_CHECKOUT="$(git -C "$(dirname "$0")" worktree list --porcelain | sed -n '1s/^worktree //p')"
+PREVIEW_ROOT="${STASH_PREVIEW_ROOT:-$(dirname "$MAIN_CHECKOUT")/stash-previews}"
+UPSTREAM_URL=https://github.com/stashapp/stash.git
+UPSTREAM_REF=upstream/develop
+TEST_TAGS="sqlite_stat4 sqlite_math_functions"
+
+# regenerated after the merge
+REGENERATED=(
+	'pkg/models/mocks/*.go'
+)
+# upstream's side taken when they conflict
+THEIRS_ON_CONFLICT=(
+	'internal/api/loaders/*_gen.go'
+)
+# upstream's copy taken, conflict or not
+UPSTREAM_OWNED=(
+	'pkg/stashbox/graphql/*'
+)
+
+die() { echo "upstream-sync: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+slug() { echo "$1" | tr '/ ' '--' | tr -cd 'A-Za-z0-9._-'; }
+
+ensure_remote() {
+	git -C "$MAIN_CHECKOUT" remote get-url upstream >/dev/null 2>&1 ||
+		git -C "$MAIN_CHECKOUT" remote add upstream "$UPSTREAM_URL"
+	info "Fetching upstream"
+	git -C "$MAIN_CHECKOUT" fetch --quiet upstream develop
+}
+
+merging() { git rev-parse -q --verify MERGE_HEAD >/dev/null; }
+
+# upstream migrations that this branch doesn't have yet
+incoming_migrations() {
+	git diff --name-only --diff-filter=A HEAD..."$UPSTREAM_REF" -- 'pkg/sqlite/migrations/*.sql'
+}
+
+matches_any() {
+	local path=$1 pattern
+	shift
+	for pattern in "$@"; do
+		# shellcheck disable=SC2053 # glob match is intended
+		[[ $path == $pattern ]] && return 0
+	done
+	return 1
+}
+
+# Resolve conflicts in generated files. Taking upstream's side for a regenerated file is
+# only a placeholder: finish regenerates it from the merged sources.
+settle_generated() {
+	local path
+	while IFS= read -r path; do
+		[[ -n "$path" ]] || continue
+		if matches_any "$path" "${REGENERATED[@]}" "${THEIRS_ON_CONFLICT[@]}" "${UPSTREAM_OWNED[@]}"; then
+			if git cat-file -e "MERGE_HEAD:$path" 2>/dev/null; then
+				git checkout --theirs -- "$path"
+				git add -- "$path"
+			else
+				git rm --quiet -- "$path"
+			fi
+			echo "    $path  (generated: settled)"
+		fi
+	done < <(git diff --name-only --diff-filter=U)
+
+	# the fork's own regeneration of upstream-owned files never survives a sync
+	for path in "${UPSTREAM_OWNED[@]}"; do
+		git checkout "$UPSTREAM_REF" -- "$path" 2>/dev/null || true
+	done
+}
+
+# The rules in pkg/sqlite/migrations_fork/README.md that a script can check.
+cmd_check() {
+	local failed=0 file table
+	cd "$(git rev-parse --show-toplevel)"
+
+	# the fork never adds to upstream's migration directory
+	git rev-parse -q --verify "$UPSTREAM_REF" >/dev/null || die "no $UPSTREAM_REF; run: scripts/upstream-sync status"
+	while IFS= read -r file; do
+		[[ -n "$file" ]] || continue
+		echo "    $file: fork migrations belong in pkg/sqlite/migrations_fork/"
+		failed=1
+	done < <(comm -23 <(ls pkg/sqlite/migrations/*.sql | sort) \
+		<(git ls-tree --name-only "$UPSTREAM_REF" pkg/sqlite/migrations/ | grep '\.sql$' | sort))
+
+	# appSchemaVersion is upstream's: it names upstream's last migration
+	local last_upstream
+	last_upstream="$(ls pkg/sqlite/migrations/ | sed -n 's/^\([0-9]*\)_.*\.up\.sql$/\1/p' | sort -n | tail -n1)"
+	if ! grep -q "^var appSchemaVersion uint = $last_upstream\$" pkg/sqlite/database.go; then
+		echo "    pkg/sqlite/database.go: appSchemaVersion should be $last_upstream, upstream's last migration"
+		failed=1
+	fi
+
+	# fork migrations may only alter tables they created
+	local created
+	created="$(cat pkg/sqlite/migrations_fork/*.sql | grep -ioE 'create table (if not exists )?[`"]?[a-z_]+' | grep -oE '[a-z_]+$' | sort -u)"
+	while IFS= read -r table; do
+		[[ -n "$table" ]] || continue
+		grep -qx "$table" <<<"$created" && continue
+		echo "    migrations_fork: alters upstream table '$table' (add a table of your own instead)"
+		failed=1
+	done < <(cat pkg/sqlite/migrations_fork/*.sql | grep -ioE '(alter|drop) table (if exists )?[`"]?[a-z_]+' | grep -oE '[a-z_]+$' | sort -u)
+
+	# versions run 1, 2, 3... and the last one is forkSchemaVersion
+	local versions expected=1 v latest
+	versions="$(ls pkg/sqlite/migrations_fork/ | sed -n 's/^\([0-9]*\)_.*\.up\.sql$/\1/p' | sort -n)"
+	for v in $versions; do
+		[[ $v == "$expected" ]] || { echo "    migrations_fork: expected version $expected, found $v"; failed=1; }
+		expected=$((v + 1))
+	done
+	latest="$(tail -n1 <<<"$versions")"
+	if ! grep -q "^var forkSchemaVersion uint = $latest\$" pkg/sqlite/fork_migrate.go; then
+		echo "    pkg/sqlite/fork_migrate.go: forkSchemaVersion should be $latest, the last fork migration"
+		failed=1
+	fi
+
+	[[ $failed == 0 ]] || die "fork migration rules broken (see pkg/sqlite/migrations_fork/README.md)"
+	info "Fork migration rules hold"
+}
+
+cmd_status() {
+	ensure_remote
+	local behind ahead
+	behind="$(git rev-list --count HEAD.."$UPSTREAM_REF")"
+	ahead="$(git rev-list --count "$UPSTREAM_REF"..HEAD)"
+	info "$(git branch --show-current): $behind upstream commits to merge, $ahead fork commits on top"
+	if [[ $behind != 0 ]]; then
+		git log --oneline --no-decorate HEAD.."$UPSTREAM_REF" | head -n 15 | sed 's/^/    /'
+		[[ $behind -le 15 ]] || echo "    ... and $((behind - 15)) more"
+	fi
+
+	local migrations
+	migrations="$(incoming_migrations)"
+	if [[ -n "$migrations" ]]; then
+		info "Upstream migrations waiting (production migrates on its first start after shipping):"
+		sed 's/^/    /' <<<"$migrations"
+	fi
+
+	info "Upstream files the fork changes (where merges can conflict):"
+	git diff --stat=100 "$(git merge-base HEAD "$UPSTREAM_REF")" HEAD --diff-filter=M -- . ':!ui' ':!docs' |
+		grep -vE '_gen\.go|/mocks/|stashbox/graphql/' | sed 's/^/   /'
+}
+
+cmd_start() {
+	[[ -z "$(git -C "$MAIN_CHECKOUT" status --porcelain --untracked-files=no)" ]] ||
+		die "the main checkout has uncommitted changes; commit or stash them first"
+	ensure_remote
+
+	local base branch wt
+	base="$(git -C "$MAIN_CHECKOUT" branch --show-current)"
+	[[ -n "$base" ]] || die "the main checkout isn't on a branch"
+	branch="upstream-sync/$(date +%Y%m%d)"
+	wt="$PREVIEW_ROOT/$(slug "$branch")"
+	git -C "$MAIN_CHECKOUT" rev-parse -q --verify "refs/heads/$branch" >/dev/null &&
+		die "branch $branch already exists (finish it, or delete it and its worktree $wt)"
+	[[ $(git -C "$MAIN_CHECKOUT" rev-list --count "$base..$UPSTREAM_REF") != 0 ]] ||
+		die "$base already has everything in $UPSTREAM_REF"
+
+	info "Creating $branch from $base in $wt"
+	mkdir -p "$PREVIEW_ROOT"
+	git -C "$MAIN_CHECKOUT" worktree add --quiet -b "$branch" "$wt" "$base"
+	mkdir -p "$wt/.local"
+	cd "$wt"
+
+	info "Merging $UPSTREAM_REF ($(git rev-parse --short "$UPSTREAM_REF"))"
+	local migrations
+	migrations="$(incoming_migrations)"
+	git merge --no-ff --no-commit "$UPSTREAM_REF" >/dev/null 2>&1 || true
+	merging || die "merge didn't start, see: git -C $wt status"
+
+	settle_generated
+
+	local conflicts
+	conflicts="$(git diff --name-only --diff-filter=U)"
+	echo
+	if [[ -n "$migrations" ]]; then
+		info "This brings in upstream migrations:"
+		sed 's/^/    /' <<<"$migrations"
+	fi
+	if [[ -n "$conflicts" ]]; then
+		info "Resolve these by hand, git add them, then run scripts/upstream-sync finish there:"
+		sed 's/^/    /' <<<"$conflicts"
+		echo
+		echo "    cd $wt"
+		exit 1
+	fi
+
+	info "No hand-written conflicts"
+	cmd_finish
+}
+
+cmd_finish() {
+	cd "$(git rev-parse --show-toplevel)"
+	merging || die "no merge in progress here (run it in the upstream-sync worktree)"
+	[[ -z "$(git diff --name-only --diff-filter=U)" ]] ||
+		die "unresolved conflicts remain: $(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+
+	info "Regenerating mocks"
+	make --no-print-directory generate-test-mocks >/dev/null 2>&1
+	git add -- "${REGENERATED[@]}"
+
+	cmd_check
+
+	info "Building"
+	make --no-print-directory generate-backend >/dev/null
+	go build ./...
+
+	info "Testing (unit + integration)"
+	local log
+	log="$(mktemp -t upstream-sync-test.XXXXXX)"
+	go test -tags "$TEST_TAGS integration" ./... >"$log" 2>&1 || {
+		grep -E '^(--- FAIL|FAIL|panic)' "$log" | head -n 30
+		die "tests failed, full output in $log (fix, git add, run finish again)"
+	}
+	rm -f "$log"
+
+	git add -u
+	git commit --quiet --no-edit -m "Merge $UPSTREAM_REF ($(git rev-parse --short MERGE_HEAD)) into $(git branch --show-current)"
+	info "Merged and committed $(git rev-parse --short HEAD) on $(git branch --show-current)"
+
+	local name
+	name="$(slug "$(git branch --show-current)")"
+	cat <<EOF
+
+Next:
+  scripts/prod pull-data                   (optional: make the dev library match production)
+  scripts/preview up $name     run it on a copy of the dev library. If upstream added a
+                                           migration, the UI asks to migrate first: do it.
+  then, in the main checkout:
+  git merge --ff-only $(git branch --show-current)
+  scripts/prod ship                        if upstream added a migration, production opens
+                                           on the migrate page: click Migrate
+  scripts/preview rm $name && git branch -d $(git branch --show-current)
+EOF
+}
+
+usage() {
+	cat <<EOF
+Merge upstream stash into this fork, in a worktree of its own.
+
+  scripts/upstream-sync status   commits and migrations waiting upstream, and the upstream
+                                 files the fork changes (where merges conflict)
+  scripts/upstream-sync start    branch upstream-sync/<date> + worktree, merge, settle
+                                 generated files; stops if hand-written files conflict
+  scripts/upstream-sync finish   (in that worktree) regenerate, check, build, test, commit
+  scripts/upstream-sync check    check the fork's migration rules in this checkout
+
+The worktree lives in $PREVIEW_ROOT, so scripts/preview can run it.
+See docs/codebase/12-upstream-sync.md.
+EOF
+}
+
+command=${1:-help}
+shift || true
+case "$command" in
+status | start | finish | check) "cmd_$command" "$@" ;;
+help | -h | --help) usage ;;
+*) die "unknown command '$command' (run with no arguments for help)" ;;
+esac

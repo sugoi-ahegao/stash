@@ -39,9 +39,9 @@ The canonical change. Say we're adding `my_field` (a nullable string).
 
 ```
  ┌─ 1. DATABASE ──────────────────────────────────────────────────────────────┐
- │  pkg/sqlite/migrations/186_scene_my_field.up.sql                           │
- │      ALTER TABLE scenes ADD COLUMN my_field VARCHAR;                       │
- │  pkg/sqlite/database.go       appSchemaVersion = 186                       │
+ │  pkg/sqlite/migrations/86_scene_my_field.up.sql      ← upstream's way;     │
+ │      ALTER TABLE scenes ADD COLUMN my_field VARCHAR;    not in this fork,  │
+ │  pkg/sqlite/database.go       appSchemaVersion = 86     see below          │
  └────────────────────────────────────────────────────────────────────────────┘
  ┌─ 2. GO MODEL ──────────────────────────────────────────────────────────────┐
  │  pkg/models/model_scene.go                                                 │
@@ -90,6 +90,13 @@ The canonical change. Say we're adding `my_field` (a nullable string).
  │  $ make it                                                                 │
  └────────────────────────────────────────────────────────────────────────────┘
 ```
+
+⚠️ **In this fork, step 1 is different.** The recipe above is how upstream adds a field. A
+fork migration must not alter an upstream table: upstream's next rebuild of `scenes` would
+copy only the columns it knows about, and `my_field` would disappear. Put the value in a
+table of your own (`migrations_fork/2_scene_my_field.up.sql`, keyed by `scene_id`, as
+`scenes_viewed_dates` is), or use custom fields. Doc 12 and
+`pkg/sqlite/migrations_fork/README.md` have the rules.
 
 **If you only need per-item metadata and not a real column**, stop at step 0 and use
 **custom fields** instead (doc 04) — no migration, no schema change, no codegen. That's the

@@ -37,13 +37,14 @@ lock error and let `txn` retry logic handle it over silently stalling.
 
 ## Schema shape
 
-Current version: **`appSchemaVersion = 185`** (`pkg/sqlite/database.go:37`).
+Current versions: upstream **`appSchemaVersion = 85`** (`pkg/sqlite/database.go:37`), and
+the fork's **`forkSchemaVersion = 1`** (`pkg/sqlite/fork_migrate.go`).
 
-⚠️ **This fork numbers its own migrations from 185 up.** Upstream stash is at 85, so the
-fork's migrations start at 185 to leave room for upstream to keep going without colliding
-with ours — a database migrated by this fork is immediately recognisable by its version
-number. Migration versions are therefore **not contiguous**: 85 is followed by 185. See
-*The per-version cycle* below for what that means for the migrator.
+⚠️ **This fork's migrations are a separate stream.** They live in
+`pkg/sqlite/migrations_fork/`, numbered from 1, and are recorded in their own table,
+`fork_schema_migrations`. They run once upstream's schema is current. Sharing upstream's
+table, under any numbering, would make a fork-migrated database skip migrations upstream
+adds later. Doc 12 explains why and how it works.
 
 ### Core entity tables
 
@@ -159,17 +160,21 @@ validation error, not a silent precedence rule.
     ├── 71_custom_fields.up.sql
     ├── 83_image_custom_fields.up.sql
     ├── 84_folder_basename.up.sql
-    ├── 85_performer_career_dates.up.sql   ← last upstream migration
-    └── 185_scene_view_history.up.sql      ← first fork migration (note the jump)
+    └── 85_performer_career_dates.up.sql   ← last upstream migration
+
+  pkg/sqlite/migrations_fork/              ← this fork's, tracked in fork_schema_migrations
+    ├── README.md                          ← the rules fork migrations follow
+    └── 1_scene_view_history.up.sql
 ```
 
 Files are embedded with `//go:embed migrations/*.sql` and executed by
-`golang-migrate/migrate` through `pkg/sqlite/migrate.go`.
+`golang-migrate/migrate` through `pkg/sqlite/migrate.go`. The fork's are embedded and run
+by `pkg/sqlite/fork_migrate.go`.
 
 ### The per-version cycle
 
 ```
-  for v := nextAvailableVersion(current) ; v != 0 ; v = nextAvailableVersion(v) {
+  for v := current + 1 ; v <= appSchemaVersion ; v++ {
 
         ┌── premigrate  (optional Go)   e.g. read data that the SQL is about to destroy
         │
@@ -179,18 +184,18 @@ Files are embedded with `//go:embed migrations/*.sql` and executed by
   }
 ```
 
-The loop walks the versions that actually exist on disk rather than counting up by one —
-`Migrator.NextSchemaVersion` / `RemainingSchemaVersions` ask the `golang-migrate` source
-driver for the next version after the current one. That is what lets 85 jump straight to
-185. `RunMigration` validates its argument against the next *available* version, and
-`StepsRequired` (the progress total in the migrate UI) counts remaining migrations, not
-the difference between version numbers.
+Upstream versions are contiguous, and `RunMigration` insists on `current + 1`.
+
+Fork migrations have no pre/post Go hooks. `runForkMigrations` backs the database up, runs
+every pending fork migration with `Migrate(forkSchemaVersion)`, and restores the backup if
+one fails.
 
 Pre/post migration Go exists because some transformations are impossible in SQLite SQL —
 particularly anything requiring hashing, filesystem access, or parsing.
 
 ⚠️ **There are no `.down.sql` files.** Migrations are forward-only. A user who runs a newer
-Stash and then downgrades gets a hard error (`database.go:168`), not a rollback. Design
+Stash and then downgrades gets a hard error (`database.go:168`), not a rollback. The same
+goes for fork migrations (`MismatchedForkSchemaVersionError`). Design
 accordingly: a migration must be safe on every real-world database, because it can't be
 undone.
 
@@ -201,16 +206,24 @@ is: create `<table>_new`, copy data across, drop the old, rename. Look at
 
 ### Adding a migration
 
+In this fork, a migration is a **fork migration**. Upstream's directory and
+`appSchemaVersion` belong to upstream.
+
 ```
- 1. Create pkg/sqlite/migrations/186_my_change.up.sql   ← fork numbering: 185 and up
- 2. Bump  appSchemaVersion = 186   in pkg/sqlite/database.go:37
- 3. (optional) 186_premigrate.go / 186_postmigrate.go  — follow the shape of 32_*.go
+ 1. Create pkg/sqlite/migrations_fork/2_my_change.up.sql   ← next fork number
+ 2. Set   forkSchemaVersion = 2   in pkg/sqlite/fork_migrate.go
+ 3. scripts/upstream-sync check   ← own tables only; numbering lines up
  4. Update the affected store in pkg/sqlite/<entity>.go (columns list, scan targets)
  5. Update pkg/models/model_<entity>.go and the *Partial struct
  6. Update graphql/schema/types/<entity>.graphql, then `make generate-backend`
  7. Test on a COPY of a real database, not just a fresh one — the interesting failures
-    are all in data that already exists.
+    are all in data that already exists. A preview gives you one (doc 11).
 ```
+
+⚠️ **A fork migration must not `ALTER` an upstream table.** Upstream rebuilds tables by
+copying the columns it knows about, so a fork column would vanish on upstream's next rebuild.
+Add a table of your own instead, keyed by the upstream row's id, or use custom fields.
+`pkg/sqlite/migrations_fork/README.md` has the full rules.
 
 Also check whether your change needs to appear in:
 

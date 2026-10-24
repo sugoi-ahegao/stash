@@ -8,15 +8,15 @@ $ git diff --stat develop...HEAD
  34 files changed, 4165 insertions(+), 68 deletions(-)
 ```
 
-**The divergence is mostly frontend, but no longer exclusively.** There is still no
-GraphQL schema change and no migration. Two hand-edited Go files carry the featured-group
-lifecycle (`internal/api/scene_featured.go`, `internal/api/resolver_mutation_scene.go`);
-a third backend file (`pkg/stashbox/graphql/generated_models.go`) is a regeneration
-artefact, and two more (`pkg/scene/generate/preview.go`, `pkg/ffmpeg/filter.go`) change
-how previews are sized.
+**The divergence is mostly frontend, but no longer exclusively.** The featured-group
+lifecycle lives in `internal/api/scene_featured.go`, hooked into
+`resolver_mutation_scene.go` by a few `// fork` call sites. View history adds GraphQL
+schema, a store and one **fork migration** (`pkg/sqlite/migrations_fork/`, its own stream,
+see doc 12). Two more files (`pkg/scene/generate/preview.go`, `pkg/ffmpeg/filter.go`)
+change how previews are sized.
 
-Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`, with
-`resolver_mutation_scene.go` as the one backend file to watch.
+Merging upstream is covered by doc 12 and `scripts/upstream-sync`. A rehearsal against 44
+upstream commits had no server-side conflicts.
 
 ## What was added
 
@@ -41,8 +41,8 @@ Rebasing onto upstream `develop` should still rarely conflict outside `ui/v2.5`,
 
   MOD  App.tsx, MainNavbar.tsx, List/views.ts    wire up the /landing route
   MOD  graphql/queries/scene.graphql             2 new queries
-  MOD  internal/api/resolver_mutation_scene.go   run the featured lifecycle on every
-                                                 scene update path
+  MOD  internal/api/resolver_mutation_scene.go   `// fork` call sites: the featured
+                                                 lifecycle on every scene update path
   MOD  Scenes/SceneDetails/Scene.tsx             count a page visit as a play
   MOD  ScenePlayer/ScenePlayer.tsx               stop the player double-counting plays
   MOD  List/ListViewOptions.tsx,                 thumbnail visibility toggle
@@ -194,22 +194,25 @@ separate path and skipped it entirely — scenes added that way got no
 `featured_added_at` stamp and no generation, so they either never appeared in the
 carousel or appeared with no preview to play. Removals never cleared the fields at all.
 
-`internal/api/scene_featured.go` now owns it, and `resolver_mutation_scene.go` calls it
-from **all three** update paths — `SceneUpdate`, `ScenesUpdate`, `BulkSceneUpdate`:
+`internal/api/scene_featured.go` now owns it. Its `featuredTracker` is hooked into **all
+three** update paths in `resolver_mutation_scene.go` (`SceneUpdate`, `ScenesUpdate` and
+`BulkSceneUpdate`) with a few `// fork` lines. The single-scene paths call
+`featured.sceneUpdate`, a wrapper around upstream's `sceneUpdate`. The bulk path calls
+`featured.before` and `featured.after` around its loop:
 
 ```
    for each scene being updated, inside the txn:
 
-     wasFeatured := sceneIsFeatured(scene)      ← read BEFORE the update
+     wasFeatured := sceneIsFeatured(scene)      ← featured.before: read BEFORE the update
      ... apply the update, then the input's own custom fields ...
-     nowFeatured := applyFeaturedChange(scene, wasFeatured)
+     nowFeatured := applyFeaturedChange(scene, wasFeatured)     ← featured.after
                       │
                       ├─ joined  → custom_fields.partial{ featured_added_at: now }
                       └─ left    → custom_fields.remove[ featured_added_at,
                                                          feature_unlocked_at ]
 
    after the txn commits:
-     generateForFeatured(newlyFeaturedIDs)      ← one job for the whole batch
+     featured.generate → generateForFeatured(newlyFeaturedIDs)   ← one job for the batch
 ```
 
 Three details are load-bearing:
@@ -518,9 +521,8 @@ keep both in step.
 only files directly inside the collection folder. Measured here, one collection went from 16
 scenes to 6. It fails silently.
 
-This one does **not** break the "no GraphQL schema change and no migration" claim above: the
-only schema-adjacent edit is a new query *document* in `ui/v2.5/graphql/`, which is a client
-document, not server schema.
+This one needs no server change: the only schema-adjacent edit is a new query *document* in
+`ui/v2.5/graphql/`, which is a client document, not server schema.
 
 ---
 
@@ -559,15 +561,15 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
 
 ## Rebasing onto upstream
 
-The files most likely to conflict, in order:
+Don't rebase. Merge, with `scripts/upstream-sync` (doc 12), so resolved conflicts stay in
+history. The files most likely to conflict, in order:
 
 ```
-  internal/api/resolver_mutation_scene.go            sceneUpdate's signature is changed
-                                                     (returns an extra bool) and three
-                                                     resolvers gained hunks
   ui/v2.5/src/components/Scenes/SceneList.tsx        large, actively developed upstream
   ui/v2.5/src/components/List/ListViewOptions.tsx    ditto
   ui/v2.5/src/components/ScenePlayer/ScenePlayer.tsx large, actively developed upstream
+  ui/v2.5/src/components/Scenes/SceneDetails/Scene.tsx   conflicted in the rehearsal
+                                                     (import list, keep both sides)
   ui/v2.5/src/models/list-filter/criteria/criterion.ts
   ui/v2.5/src/App.tsx, MainNavbar.tsx, locales/en-GB.json   small, mechanical
   pkg/scene/generate/preview.go                      a removed scale filter, a removed
@@ -575,14 +577,20 @@ The files most likely to conflict, in order:
                                                      call; an upstream change here will
                                                      look like a clean take of theirs —
                                                      re-check all three
+  pkg/sqlite/scene.go, scene_filter.go,              view history: small additions
+    pkg/scene/{import,export,merge}.go,              inside upstream code
+    graphql/schema/types/scene.graphql
+  internal/api/resolver_mutation_scene.go            `// fork` call sites only
   pkg/ffmpeg/filter.go                               new helper, appended near ScaleWidth
 ```
 
-`pkg/stashbox/graphql/generated_models.go` should be resolved by **regenerating**
-(`make generate-stash-box-client`), never by merging hunks.
+`pkg/stashbox/graphql/generated_models.go` is upstream's copy. Take theirs on every
+merge, and don't regenerate it in the fork: it's generated from stashdb.org's live
+schema, so a regeneration here is churn.
 
-Everything under `components/Landing/`, plus `internal/api/scene_featured.go`, is new
-files and will never conflict.
+Everything under `components/Landing/`, plus `internal/api/scene_featured.go`,
+`internal/api/resolver_mutation_scene_view.go`, `pkg/sqlite/fork_migrate.go` and
+`pkg/sqlite/migrations_fork/`, is new files and will never conflict.
 
 ⚠️ `internal/api/scene_featured.go` and
 `ui/v2.5/src/components/Landing/featuredGroup.ts` **duplicate** the group ID and the two
