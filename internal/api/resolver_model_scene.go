@@ -444,40 +444,6 @@ func (r *sceneResolver) PlayHistory(ctx context.Context, obj *models.Scene) ([]*
 	return ptrRet, nil
 }
 
-func (r *sceneResolver) LastViewedAt(ctx context.Context, obj *models.Scene) (*time.Time, error) {
-	ret, err := loaders.From(ctx).SceneLastViewed.Load(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}
-
-func (r *sceneResolver) ViewCount(ctx context.Context, obj *models.Scene) (*int, error) {
-	ret, err := loaders.From(ctx).SceneViewCount.Load(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ret, nil
-}
-
-func (r *sceneResolver) ViewHistory(ctx context.Context, obj *models.Scene) ([]*time.Time, error) {
-	ret, err := loaders.From(ctx).SceneViewHistory.Load(obj.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	// convert to pointer slice
-	ptrRet := make([]*time.Time, len(ret))
-	for i, t := range ret {
-		tt := t
-		ptrRet[i] = &tt
-	}
-
-	return ptrRet, nil
-}
-
 func (r *sceneResolver) OHistory(ctx context.Context, obj *models.Scene) ([]*time.Time, error) {
 	ret, err := loaders.From(ctx).SceneOHistory.Load(obj.ID)
 	if err != nil {

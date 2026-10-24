@@ -33,14 +33,10 @@ const (
 	groupsScenesTable     = "groups_scenes"
 	scenesURLsTable       = "scene_urls"
 	sceneURLColumn        = "url"
-	// ⚠️ scenes_view_dates backs PLAY history, not view history - the name predates the
-	// rename of "views" to "plays". View history is scenes_viewed_dates, below.
-	scenesViewDatesTable   = "scenes_view_dates"
-	sceneViewDateColumn    = "view_date"
-	scenesViewedDatesTable = "scenes_viewed_dates"
-	sceneViewedDateColumn  = "viewed_date"
-	scenesODatesTable      = "scenes_o_dates"
-	sceneODateColumn       = "o_date"
+	scenesViewDatesTable  = "scenes_view_dates"
+	sceneViewDateColumn   = "view_date"
+	scenesODatesTable     = "scenes_o_dates"
+	sceneODateColumn      = "o_date"
 
 	sceneCoverBlobColumn = "cover_blob"
 )
