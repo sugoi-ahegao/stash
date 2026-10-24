@@ -5,13 +5,15 @@ is derived, and why it needed no backend change.
 
 ## What a collection is
 
-Each library root has an intake folder, `New`, and the top-level folders inside it are where
-batches of material get filed:
+Each library root has an intake folder, `New` in this library, and the top-level folders
+inside it are where batches of material get filed. Its name is the **Collections intake
+folder** setting (Settings > Interface > This Library, `collectionsFolder` in the UI config,
+read through `src/core/forkConfig.ts`); with none set, Collections shows nothing:
 
 ```
   /mnt/e/sys.tmp/hades/V2 NYX/Stash Libraries/Stash Production / New / 2025-05-06
   └──────────────── library root (a configured stash) ────────┘ └─┬─┘ └──── collection ────┘
-                                                            COLLECTIONS_FOLDER
+                                                           the intake folder
 ```
 
 A collection is **one level inside `New`, no deeper**. Its name is often a date the material
@@ -58,7 +60,8 @@ this is not a date-only concern.
 ## Why there is no backend change
 
 - **The roots come from config.** `configuration.general.stashes` is already in the UI's
-  config context, so the library roots need no query and nothing is hardcoded.
+  config context, so the library roots need no query, and the intake folder is a UI
+  config setting.
 - **One folder query.** `FindCollectionFolders` fetches every folder as `{id, path, basename}`
   (901 rows today). Classification is pure string work against the root paths, which means
   the `New` folders themselves never have to be looked up by id.
@@ -77,7 +80,7 @@ this is not a date-only concern.
   FindCollectionFolders ──────────┤   (every folder: id, path, basename)
                                   ▼        src/core/collections.ts
   ┌──────────────────────────────────────────────────────────────────────┐
-  │  toCollections(folders, roots)                                       │
+  │  toCollections(folders, { roots, intakeFolder })                     │
   │    keep folders exactly at <root>/New/<name>                         │
   │    drop names that are absolute Windows paths                        │
   │    merge by name across roots  → { name, folders[] }                 │
@@ -221,7 +224,5 @@ and "view all" link.
 
 ## Where it would go next
 
-- **Make `New` configurable.** `COLLECTIONS_FOLDER` is one constant; `IUIConfig` (doc 05) is
-  the sanctioned home for it as a setting, with no backend work.
 - **Include `Organized`/`Coalesce`** behind a toggle, if collections should ever cover the
   whole library rather than the intake area.

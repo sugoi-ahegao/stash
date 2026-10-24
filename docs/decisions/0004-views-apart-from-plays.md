@@ -26,4 +26,7 @@ independent and nothing copies between them.
 - Every path that records "seen" calls `sceneAddView`, never `sceneAddPlay`.
 - `useSceneAddView` defaults to `evictLists: false`, because most callers record from
   inside a visible list and a refetch would pull the grid out from under the cursor.
+- The UI's ways of recording a view are in `ui/v2.5/src/components/Scenes/sceneViews.tsx`
+  and `MarkViewedButton.tsx`. Hovering a card records one only on pages wrapped in
+  `ViewOnHover`, each with its own setting.
 - Merge, import and export carry view history alongside play history.

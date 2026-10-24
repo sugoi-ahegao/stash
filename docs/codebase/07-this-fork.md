@@ -26,13 +26,18 @@ upstream commits had no server-side conflicts.
 ```
   NEW  ui/v2.5/src/components/Landing/
          Landing.tsx           the /landing page
-         FeaturedCarousel.tsx  the carousel + hold-to-reveal slide  (419 lines)
-         featuredGroup.ts      constants: group id + custom-field names
+         FeaturedCarousel.tsx  the carousel + hold-to-reveal slide
          featuredPolicy.ts     the unlock budget, visibility and removal rules
-         styles.scss           carousel styling (296 lines)
+         styles.scss           carousel styling
+  NEW  ui/v2.5/src/core/featured.ts         custom-field names, isFeatured/withFeatured
 
-  NEW  internal/api/scene_featured.go       featured group id + custom-field names,
-                                           membership diffing, generate trigger
+  NEW  internal/api/scene_featured.go       reads the featured group setting; custom-field
+                                           names, membership diffing, generate trigger
+
+  NEW  ui/v2.5/src/core/forkConfig.ts       the fork's settings (featured group, golden tag,
+       Settings/SettingsInterfacePanel/       intake folder, view on hover), stored in the
+         ForkSettings.tsx                     UI config; Settings > Interface > This Library
+  MOD  core/config.ts, SettingsInterfacePanel.tsx   their keys, and the section's call site
 
   NEW  ui/v2.5/src/core/collections.ts            collection derivation rules (see doc 10)
   NEW  ui/v2.5/src/components/Scenes/
@@ -47,19 +52,31 @@ upstream commits had no server-side conflicts.
   MOD  internal/api/resolver_mutation_scene.go   `// fork` call sites: the featured
                                                  lifecycle on every scene update path
   NEW  internal/api/resolver_mutation_scene_view.go,   view history (Feature 4): store,
-       pkg/sqlite/history.go (viewedDateManager),    schema, filters, sorts, mutations,
-       pkg/sqlite/migrations_fork/1_*.up.sql,        dataloaders, import/export/merge
+       internal/api/resolver_model_scene_viewed.go,  schema, filters, sorts, mutations,
+       internal/api/loaders/dataloaders_viewed.go,   dataloaders, import/export/merge.
+       pkg/models/repository_scene_viewed.go,        Each *_viewed.go file is the fork
+       pkg/sqlite/scene_viewed.go,                   half of the upstream file it's
+       pkg/sqlite/migrations_fork/1_*.up.sql,        named after
        pkg/sqlite/fork_migrate.go,
        internal/api/loaders/scene*view*_gen.go
-  MOD  Scenes/SceneDetails/Scene.tsx             a page visit records a view
-  MOD  Scenes/SceneCard.tsx, core/hoverView.ts,  mark-viewed button; a dwell on a landing
-       core/viewed.ts                            card records a view
+  NEW  Scenes/sceneViews.tsx, core/viewed.ts,    the ways a view is recorded: page open,
+       Scenes/MarkViewedButton.tsx               hovering a card, the eye button
+  MOD  Scenes/SceneDetails/Scene.tsx,            call sites: useViewOnOpen, the golden and
+       Scenes/Scenes.tsx, Landing/Landing.tsx    featured buttons, <ViewOnHover page=…>
+  MOD  Scenes/SceneCard.tsx                      call sites: the eye button, useGoldenCard,
+                                                 useDwellView
   MOD  SceneDetails/SceneHistoryPanel.tsx        View History beside play and O history
-  NEW  SceneDetails/FeaturedButton.tsx           featured toggle on the scene page
+  NEW  SceneDetails/FeaturedButton.tsx,          featured and golden toggles on the scene
+       SceneDetails/GoldenButton.tsx             page, each running its own update
+  NEW  core/golden.ts, Scenes/GoldenCard.tsx,    golden cards (Feature 6)
+       Scenes/golden-card.scss, Scenes/flames.png,
+       ui/v2.5/scripts/build_flame_sprite.py
   NEW  components/ThemeSwitcher.tsx,             theme switcher in the navbar: Blueprint
        utils/theme.ts, styles/themes/_pb.scss    (default) and pb, per browser
-  MOD  List/ListViewOptions.tsx,                 thumbnail visibility toggle
+  NEW  List/ThumbnailToggle.tsx                 thumbnail visibility toggle
+  MOD  List/ListViewOptions.tsx,                 (Feature 2)
        List/FilteredListToolbar.tsx,
+       hooks/LocalForage.ts,
        Scenes/SceneList.tsx, Scenes/styles.scss
   MOD  utils/text.ts, criteria/criterion.ts,     relative date expressions in filters
        List/Filters/TimestampFilter.tsx
@@ -71,31 +88,47 @@ upstream commits had no server-side conflicts.
   MOD  locales/en-GB.json, index.scss
 ```
 
-Five numbered features below, plus a handful of standalone tweaks. Take them one at a
-time. (The theme switcher and featured toggle are recent and only in the table above.)
+Six numbered features below, plus a handful of standalone tweaks. Take them one at a
+time. (The theme switcher is only in the table above.)
+
+## The fork's settings
+
+Everything that ties a feature to something in one particular library is a setting, under
+**Settings > Interface > This Library** (`ForkSettings.tsx`). They're stored in the UI
+config, which the server can read too, and read through `src/core/forkConfig.ts`:
+
+| setting (UI config key) | what it's for | unset means |
+|---|---|---|
+| Featured group (`featuredGroupId`) | the carousel's group (Feature 1); the server reads it too | no carousel, no featured button, nothing stamped |
+| Golden tag (`goldenTagId`) | golden cards (Feature 6) | nothing is golden, no golden button |
+| Collections intake folder (`collectionsFolder`) | Collections' rows (Feature 5) | Collections shows nothing |
+| View on hover, landing (`viewOnHoverLanding`) | Feature 4 | on |
+| View on hover, Scenes page (`viewOnHoverScenes`) | Feature 4 | off |
+
+⚠️ An install that has never set them has no carousel, golden cards or collections. Before
+the settings existed these were constants (group `25`, tag `1414`, folder `New`), so a
+fresh production database needs them set once.
 
 ---
 
 ## Feature 1 — The featured carousel
 
-### The data model, and its one hardcoded assumption
+### The data model
 
 There is no new schema. The feature is built entirely on **an existing Group** plus **two
 custom fields** — exactly the "use the sanctioned extension surfaces" approach from doc 06.
-
-`featuredGroup.ts`:
+Which group is the `featuredGroupId` setting (see *The fork's settings* above). The field
+names are in `core/featured.ts` and again in `internal/api/scene_featured.go`, which must
+agree:
 
 ```ts
-export const FEATURED_GROUP_ID = "25";                          // ⚠️ hardcoded
 export const FEATURED_ADDED_AT_FIELD = "featured_added_at";
 export const FEATURE_UNLOCKED_AT_FIELD = "feature_unlocked_at";
 ```
 
-⚠️ **`FEATURED_GROUP_ID = "25"` is a hardcoded row ID in one specific library.** The file
-says so honestly. This is the single biggest portability blocker: the branch will show an
-empty carousel on any other database. The obvious fix is an `IUIConfig` key
-(`featuredGroupId?: string`) — which needs no backend change at all (doc 05), just a
-Settings control and a fallback.
+The point of the group is your own workflow: you add a scene to it to have it come up in
+the carousel, you watch it, and rating it is what says you're done with it, so a rated
+scene leaves the group (the removal sweep below).
 
 A scene's carousel state lives in its custom fields:
 
@@ -123,7 +156,7 @@ A scene's carousel state lives in its custom fields:
                                    ▼
    ┌──────────────────────────────────────────────────────────────────────┐
    │  /landing → FeaturedCarousel                                         │
-   │    FindFeaturedScenes(groups INCLUDES 25, per_page: -1)              │
+   │    FindFeaturedScenes(groups INCLUDES <group>, per_page: -1)         │
    │    sort client-side by featured_added_at, then walk the list filling  │
    │    up to 10 slots, skipping expired unlocks and any locked slide       │
    │    beyond today's remaining unlock budget                              │
@@ -209,7 +242,10 @@ carousel or appeared with no preview to play. Removals never cleared the fields 
 
 `internal/api/scene_featured.go` now owns it. Its `featuredTracker` is hooked into **all
 three** update paths in `resolver_mutation_scene.go` (`SceneUpdate`, `ScenesUpdate` and
-`BulkSceneUpdate`) with a few `// fork` lines. The single-scene paths call
+`BulkSceneUpdate`) with a few `// fork` lines. Those are the paths that adding a scene to a
+group by hand goes through. Creating, merging or importing a scene that is already in the
+group doesn't stamp it; that isn't a way scenes get featured. The tracker reads the
+featured group setting once per request, and with none set it does nothing. The single-scene paths call
 `featured.sceneUpdate`, a wrapper around upstream's `sceneUpdate`. The bulk path calls
 `featured.before` and `featured.after` around its loop:
 
@@ -329,11 +365,9 @@ which is what makes it easy to raise the limit temporarily while testing.
 
 | | |
 |---|---|
-| ⚠️ | `FEATURED_GROUP_ID` hardcoded to `"25"` — not portable |
 | ⚠️ | `per_page: -1` fetches **every** scene in the group, then slices to 10 client-side. Fine at current group sizes; it's an unbounded query as the group grows. Sorting server-side isn't possible today because the sort key is a custom field. |
 | ⚠️ | Several `.catch(() => {})` swallow mutation failures silently — an unlock that fails to persist still looks unlocked until reload |
 | ⚠️ | The generate job is fired and forgotten on featuring a scene — the error is logged server-side, but nothing retries, and the slide falls back to the screenshot with no preview. `overwrite` is unset, so a scene left with a broken preview by a failed run will be *skipped* rather than repaired on a later featuring; it needs a manual generate with overwrite on. |
-| ⚠️ | `Landing.tsx` renders a full `SceneList` under the carousel with `View.Landing`, so it has its own persisted sort/zoom — that part is correctly done |
 
 ---
 
@@ -342,23 +376,23 @@ which is what makes it easy to raise the limit temporarily while testing.
 An eye/eye-slash button in the list view options that hides scene grid thumbnails.
 
 ```
-  SceneList.tsx        useState(showThumbnails)  ← local state, default false
-        │
+  SceneList.tsx        useShowThumbnails(view)  ← List/ThumbnailToggle.tsx; default hidden,
+        │                                       remembered per view in this browser
         ├─ className: "hide-thumbnails" on .item-list-container
         │       └─ Scenes/styles.scss does the actual hiding + hover reveal
         │
         └─ passes showThumbnails / onSetShowThumbnails down through
-              FilteredListToolbar → ListViewOptions → ThumbnailToggleButton
-                 (rendered only when displayMode === DisplayMode.Grid)
+              FilteredListToolbar → ListViewOptions → ThumbnailToggle
+                 (rendered only in the Grid and Collections display modes)
 ```
+
+The choice is stored in the interface local forage's `viewConfig`, beside the sidebar's
+open state (`hooks/LocalForage.ts`), so it's per browser and per list: the landing page and
+the Scenes page remember their own.
 
 The plumbing is written generically — `ListViewOptions` and `FilteredListToolbar` take
 optional props and render the button only when both are supplied — so other entity lists
 can opt in by adding the same two props.
-
-⚠️ **The state is component-local and resets on navigation.** If it should persist, it
-belongs in `IUIConfig` (per-view, alongside zoom and display mode) rather than `useState` —
-see doc 05 on saved UI options. This is the natural next step for the feature.
 
 ---
 
@@ -398,12 +432,15 @@ player ran past `minimumPlayPercent`. Why they're separate:
 a scene recorded a *play* and the player's own increment was disabled. That's gone.)
 
 ```
-  Scenes/SceneDetails/Scene.tsx    page opened: effect keyed on scene.id, guarded by a
-                                   ref (StrictMode fires once), respects ui.trackActivity
-  Scenes/SceneCard.tsx             landing page only: cursor on a card for hoverViewDelay
-                                   (3 s), once per card. The eye button: marked by hand,
-                                   lit while the last view falls on today
-        │
+  Scenes/sceneViews.tsx
+    useViewOnOpen                  page opened: effect keyed on scene.id, guarded by a
+                                   ref (StrictMode fires once)
+    ViewOnHover + useDwellView     cursor on a card for hoverViewDelay (3 s), once per
+                                   card, on the pages whose setting is on. Landing.tsx and
+                                   Scenes.tsx wrap their lists in <ViewOnHover page=…>
+  Scenes/MarkViewedButton.tsx      the eye button: marked by hand, lit while the last
+                                   view falls on today
+        │      all of them off when the player's "track activity" setting is
         ▼
   sceneAddView(id)  ──►  scenes_viewed_dates   (fork migration 1)
                          view_history · view_count · last_viewed_at on Scene,
@@ -420,7 +457,9 @@ Upstream's `viewDateManager` / `scenes_view_dates` is PLAY history.
   independent.
 - `useSceneAddView` doesn't evict list caches by default, because a refetch would replace
   the grid under the cursor. Pass `true` where a list should refresh.
-- Browsing the scenes list records nothing. Only the landing page counts dwells.
+- Hovering records views on the landing page by default and on the Scenes page if its
+  setting is on. Cards anywhere else (a performer's scenes, the scene page's queue) never
+  do, because nothing wraps them in a `ViewOnHover`.
 - `SceneHistoryPanel` shows View History beside play and O history, with its own add,
   delete and reset.
 
@@ -513,12 +552,13 @@ visible as a scroll affordance. Anything at or above `100vh` will hide it again.
 
 A **Collections** display mode for the scene list, alongside Grid / List / Wall / Tagger:
 one row of scene cards per intake folder — the top-level folders inside each library root's
-`New` directory. `/landing` opens in it.
+intake directory (the `collectionsFolder` setting, `New` in this library). `/landing` opens
+in it.
 
 **[Doc 10](10-collections.md) is the full write-up** — read it before changing any of it.
 The short version:
 
-- A collection is **derived, not stored**: `<library root>/New/<name>`, one level deep. Its
+- A collection is **derived, not stored**: `<library root>/<intake>/<name>`, one level deep. Its
   name is often a date but just as often a pack name, and **nothing is assumed about it**.
 - A collection is a **name**, not a folder — the same name under two roots is one collection
   holding both roots' scenes.
@@ -542,6 +582,33 @@ This one needs no server change: the only schema-adjacent edit is a new query *d
 
 ---
 
+## Feature 6 — Golden cards
+
+A scene tagged with the golden tag (the `goldenTagId` setting) is a favourite of
+favourites, and its card burns: charred card stock, a burning rim, hand-drawn flames
+licking up over the thumbnail, and sparks.
+
+```
+  core/golden.ts             isGolden / withGolden, goldenActivationDelay (1 s)
+  Scenes/GoldenCard.tsx      useGoldenCard(scene): the card's class, its fire layers
+                             (SceneFire) and the hover handlers that wake it
+  Scenes/golden-card.scss    all of the look and the animation
+  Scenes/flames.png          the flame sprite strip: ten frames
+  ui/v2.5/scripts/build_flame_sprite.py   builds flames.png from the source sheet
+  SceneDetails/GoldenButton.tsx           the toggle on the scene page
+```
+
+- **A golden card is an ordinary card until it's woken.** It wakes after the cursor has
+  rested on it for `goldenActivationDelay` and then stays awake for as long as it's on
+  screen. Idle golden cards animate nothing, which is what keeps a screen of them cheap.
+- The layering is by z-index, not DOM order, so `SceneFire` can be passed to `GridCard` as
+  one `decorations` element. The comment at the top of `golden-card.scss` lists the layers.
+- The flames are a sprite strip stepped through with `steps()`, not tweened, and they are
+  revealed with a clip rather than scaled, because a hand-drawn flame doesn't survive being
+  stretched.
+
+---
+
 ## If you're taking this upstream
 
 Read the "Project norms" section of doc 06 first. Against Stash's stated design vision:
@@ -554,16 +621,16 @@ Read the "Project norms" section of doc 06 first. Against Stash's stated design 
   library-specific, and the docs explicitly say superfluous features should be
   "considered for third-party plugins instead". Most of it is *already* written the way a
   plugin would be — group + custom fields + UI only, no schema — so porting it to the
-  plugin API (`PatchComponent`, `registerRoute`, `IUIConfig` for the group ID) is a
-  realistic path rather than a rewrite. The exception is now the server-side lifecycle:
-  a hardcoded group ID living in `internal/api` is not upstreamable as-is, and the
-  plugin-API route would put that logic behind a `SceneUpdatePost` hook instead.
+  plugin API (`PatchComponent`, `registerRoute`, the group ID already in `IUIConfig`) is
+  a realistic path rather than a rewrite. The exception is the server-side lifecycle in
+  `internal/api`; the plugin-API route would put that logic behind a `SceneUpdatePost`
+  hook instead.
 - **Feature 5 (collections)** is library-specific by construction — it assumes a foldering
   convention upstream has no reason to assume — so it belongs in a plugin, and it is already
   shaped like one: no schema, no Go, an existing criterion, and all its rules in one pure
   module. The awkward part for a plugin is the display mode itself: `DisplayMode` is a core
-  enum, so a plugin would patch `SceneList` rather than add a mode. `IUIConfig` would hold
-  the intake folder name.
+  enum, so a plugin would patch `SceneList` rather than add a mode. The intake folder is
+  already in `IUIConfig`.
 - **Feature 4 (view history)** leaves upstream's play semantics alone, which makes it
   far more upstreamable than the play-on-open it replaced. It is real schema, though: a
   table, filters, sorts and mutations. Upstream would want the migration in its own
@@ -584,6 +651,8 @@ history. The files most likely to conflict, in order:
   ui/v2.5/src/components/Scenes/SceneList.tsx        large, actively developed upstream
   ui/v2.5/src/components/List/ListViewOptions.tsx    ditto
   ui/v2.5/src/components/ScenePlayer/ScenePlayer.tsx large, actively developed upstream
+  ui/v2.5/src/components/Scenes/SceneCard.tsx       hook and button call sites, the
+                                                     preview's has-preview class
   ui/v2.5/src/components/Scenes/SceneDetails/Scene.tsx   conflicted in the rehearsal
                                                      (import list, keep both sides)
   ui/v2.5/src/models/list-filter/criteria/criterion.ts
@@ -593,8 +662,10 @@ history. The files most likely to conflict, in order:
                                                      call; an upstream change here will
                                                      look like a clean take of theirs —
                                                      re-check all three
-  pkg/sqlite/scene.go, scene_filter.go,              view history: small additions
-    pkg/scene/{import,export,merge}.go,              inside upstream code
+  pkg/sqlite/scene.go, scene_filter.go,              view history: the sort and filter
+    pkg/scene/{import,export,merge}.go,              cases, the store's embedding, and
+    internal/api/loaders/dataloaders.go,             the loaders' fields; the rest is
+    pkg/models/repository_scene.go,                  in the *_viewed.go files
     graphql/schema/types/scene.graphql
   internal/api/resolver_mutation_scene.go            `// fork` call sites only
   pkg/ffmpeg/filter.go                               new helper, appended near ScaleWidth
@@ -604,12 +675,11 @@ history. The files most likely to conflict, in order:
 merge, and don't regenerate it in the fork: it's generated from stashdb.org's live
 schema, so a regeneration here is churn.
 
-Everything under `components/Landing/`, plus `internal/api/scene_featured.go`,
-`internal/api/resolver_mutation_scene_view.go`, `pkg/sqlite/fork_migrate.go` and
-`pkg/sqlite/migrations_fork/`, is new files and will never conflict.
+Everything under `components/Landing/`, plus `internal/api/scene_featured.go`, the
+`*_viewed.go` files, `internal/api/resolver_mutation_scene_view.go`,
+`pkg/sqlite/fork_migrate.go` and `pkg/sqlite/migrations_fork/`, is new files and will never
+conflict.
 
-⚠️ `internal/api/scene_featured.go` and
-`ui/v2.5/src/components/Landing/featuredGroup.ts` **duplicate** the group ID and the two
-custom-field names. Both files say so, but nothing enforces it — change one and you must
-change the other. Moving the ID into `IUIConfig` would collapse the duplication to a
-single configured value and is the fix worth making.
+⚠️ `internal/api/scene_featured.go` and `ui/v2.5/src/core/featured.ts` both name the two
+custom fields. Change one and you must change the other. The group ID itself is one
+setting both sides read.

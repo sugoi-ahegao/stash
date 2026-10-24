@@ -44,9 +44,10 @@ Rules: [`pkg/sqlite/migrations_fork/README.md`](../../../pkg/sqlite/migrations_f
 ## 4. Server code, the fork's way
 
 [Decision 0002](../../../docs/decisions/0002-fork-code-at-call-sites.md): new behaviour
-goes in **new files** (e.g. `internal/api/resolver_mutation_scene_view.go`,
-`pkg/sqlite/history.go`). Where an upstream file must call it, add one line and mark it
-`// fork`. Don't change upstream function signatures; wrap them.
+goes in **new files** (e.g. `internal/api/resolver_mutation_scene_view.go`). Additions to
+an upstream type or package go in a fork file in the same package, named after the upstream
+file (`pkg/sqlite/scene_viewed.go` beside `scene.go`, `resolver_model_scene_viewed.go`).
+Where an upstream file must call it, add one line and mark it `// fork`. Don't change upstream function signatures; wrap them.
 
 Checklist, with doc 06's gotchas:
 

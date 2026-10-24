@@ -24,6 +24,7 @@ filterable, sortable history table.
   group and sorts client-side, which is fine at its size and unbounded as it grows.
 - Custom-field updates have three modes, and `full` replaces the whole map. Use `partial`
   to set and `remove` to delete, or unrelated fields get clobbered.
-- `FEATURED_GROUP_ID = "25"` is a row id in this one library. Moving it to `IUIConfig` is
-  the known fix.
+- Which group, tag and folder the features use are UI config settings (Settings >
+  Interface > This Library), which the server can read too. The featured group used to be
+  the constant `25` in both Go and TypeScript.
 - Details: [`docs/codebase/07-this-fork.md`](../codebase/07-this-fork.md), Feature 1.
