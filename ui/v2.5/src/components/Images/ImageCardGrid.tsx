@@ -15,7 +15,7 @@ interface IImageCardGrid {
   onPreview: (index: number, ev: React.MouseEvent<Element, MouseEvent>) => void;
 }
 
-const zoomWidths = [280, 340, 480, 640];
+const zoomWidths = [280, 340, 480, 640, 1000, 1900];
 
 export const ImageCardGrid: React.FC<IImageCardGrid> = PatchComponent(
   "ImageCardGrid",

@@ -16,7 +16,7 @@ interface IGroupCardGrid {
   onMove?: (srcIds: string[], targetId: string, after: boolean) => void;
 }
 
-const zoomWidths = [210, 250, 300, 375];
+const zoomWidths = [210, 250, 300, 375, 470, 590];
 
 export const GroupCardGrid: React.FC<IGroupCardGrid> = PatchComponent(
   "GroupCardGrid",

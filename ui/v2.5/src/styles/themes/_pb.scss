@@ -1,0 +1,552 @@
+/* pb: near-black surfaces with a glowing red accent */
+
+$pb-bg: #000;
+$pb-surface: #0a0a0b;
+$pb-raised: #151517;
+$pb-line: #232326;
+$pb-field: rgba(255, 255, 255, 0.04);
+$pb-text: #ececec;
+$pb-muted: #8c8c90;
+$pb-red: #ff1f3d;
+$pb-red-dark: #c4102a;
+$pb-red-light: #ff5c70;
+$pb-glow: 0 0 6px rgba(255, 31, 61, 0.75), 0 0 18px rgba(255, 31, 61, 0.35);
+$pb-text-glow: 0 0 8px rgba(255, 31, 61, 0.6);
+
+/* stylelint-disable selector-class-pattern */
+html[data-theme="pb"] {
+  background-color: $pb-bg;
+
+  body,
+  .top-nav,
+  .filtered-list-toolbar,
+  .sidebar-pane .sidebar,
+  .sidebar-toolbar,
+  .sidebar .sidebar-footer,
+  #queue-viewer .queue-controls,
+  #scene-edit-details .edit-buttons-container,
+  div.react-datepicker {
+    background-color: $pb-bg;
+  }
+
+  body {
+    color: $pb-text;
+  }
+
+  .top-nav {
+    border-bottom: 1px solid $pb-line;
+  }
+
+  .text-muted {
+    color: $pb-muted;
+  }
+
+  a,
+  .btn.link,
+  .scrubber-button {
+    color: $pb-red-light;
+  }
+
+  a:hover {
+    color: $pb-red;
+    text-shadow: $pb-text-glow;
+  }
+
+  // surfaces
+
+  .manual-body,
+  .job-table.card,
+  .skeleton-card,
+  .detail-header,
+  .featured-slide-image,
+  .table-list thead,
+  .package-manager table thead,
+  .modal-content,
+  .toast,
+  .list-group-item {
+    background-color: $pb-surface;
+  }
+
+  .card {
+    background-color: $pb-bg;
+    box-shadow: 0 0 0 1px $pb-line;
+  }
+
+  .bg-secondary,
+  .bg-dark,
+  .popover,
+  .popover-body,
+  div.dropdown-menu,
+  div.react-select__menu,
+  div.react-select__control,
+  .input-control,
+  .input-control:focus,
+  .input-control:disabled,
+  .clearable-text-field:focus,
+  .clearable-text-field-clear,
+  .query-text-field-clear,
+  .modifier-options .modifier-option,
+  .sort-by-select .dropdown-menu .sort-by-filter-container,
+  .scraper-menu .dropdown-menu .scraper-filter-container,
+  .recommendations-container-edit .recommendation-row,
+  #queue-viewer .current,
+  .stash-id-pill a,
+  .react-datepicker-time__header {
+    background-color: $pb-raised;
+  }
+
+  .text-input,
+  .text-input:focus,
+  .text-input[readonly],
+  .text-input:disabled,
+  .form-control,
+  .form-control:focus {
+    background-color: $pb-field;
+    color: $pb-text;
+  }
+
+  .text-input:focus,
+  .form-control:focus,
+  .input-control:focus {
+    box-shadow: 0 0 0 1px $pb-red, 0 0 8px rgba(255, 31, 61, 0.4);
+  }
+
+  div.react-select__control,
+  .popover,
+  .modal-header,
+  .modal-footer,
+  .toast-header,
+  div.dropdown-menu {
+    border-color: $pb-line;
+  }
+
+  div.react-select__control--is-focused {
+    border-color: $pb-red;
+    box-shadow: 0 0 0 1px $pb-red;
+  }
+
+  .popover .arrow::after {
+    border-bottom-color: $pb-raised;
+    border-top-color: $pb-raised;
+  }
+
+  .react-select__option--is-focused,
+  .dropdown-item:focus,
+  .dropdown-item:hover {
+    background-color: rgba(255, 31, 61, 0.12);
+  }
+
+  .react-select__option--is-selected,
+  .dropdown-item.active,
+  .dropdown-item:active {
+    background-color: rgba(255, 31, 61, 0.25);
+    color: $pb-text;
+  }
+
+  .sidebar-pane .sidebar {
+    border-right-color: $pb-line;
+  }
+
+  .sidebar-section,
+  .sidebar-toggle-button-container .sidebar-toggle-button,
+  .table thead th,
+  .table td {
+    border-color: $pb-line;
+  }
+
+  .modal-backdrop.show {
+    opacity: 0.85;
+  }
+
+  // accent
+
+  // minimal buttons also carry .btn-primary, and must stay transparent
+  .btn-primary:not(.minimal),
+  .btn-primary:not(.minimal):disabled,
+  .btn-primary:not(.minimal).disabled {
+    background-color: $pb-red-dark;
+    border-color: $pb-red-dark;
+    color: #fff;
+  }
+
+  .btn-primary:not(.minimal):hover,
+  .btn-primary:not(.minimal):focus,
+  .btn-primary:not(.minimal):not(:disabled):not(.disabled):active,
+  .btn-primary:not(.minimal):not(:disabled):not(.disabled).active,
+  .show > .btn-primary.dropdown-toggle:not(.minimal) {
+    background-color: $pb-red;
+    border-color: $pb-red;
+    box-shadow: $pb-glow;
+  }
+
+  .btn-secondary,
+  .btn-secondary:disabled,
+  .btn-secondary.disabled {
+    background-color: $pb-raised;
+    border-color: $pb-line;
+    color: $pb-text;
+  }
+
+  .btn-secondary:hover,
+  .btn-secondary:focus,
+  .btn-secondary:not(:disabled):not(.disabled):active,
+  .btn-secondary:not(:disabled):not(.disabled).active,
+  .show > .btn-secondary.dropdown-toggle {
+    background-color: #202024;
+    border-color: #2e2e33;
+    box-shadow: none;
+  }
+
+  .btn.active:not(.disabled),
+  .btn.active.minimal:not(.disabled) {
+    background-color: rgba(255, 31, 61, 0.15);
+    color: $pb-red-light;
+  }
+
+  a.minimal:hover:not(:disabled),
+  button.minimal:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .top-nav .btn.minimal {
+    color: #fff;
+  }
+
+  .top-nav .btn.active:not(.disabled),
+  .top-nav .btn.active:not(.disabled):hover {
+    background-color: $pb-red-dark;
+    color: #fff;
+  }
+
+  // the focus ring glows red instead of bootstrap's blue
+  .top-nav .btn:focus,
+  .top-nav .btn.focus,
+  .top-nav .btn:not(:disabled):not(.disabled):active:focus,
+  .top-nav .btn:not(:disabled):not(.disabled).active:focus {
+    box-shadow: $pb-glow;
+  }
+
+  .navbar-brand .brand-link {
+    color: $pb-red;
+    text-shadow: $pb-text-glow;
+  }
+
+  .nav-tabs .nav-link.active,
+  .nav-tabs .nav-link.active:hover {
+    background-color: $pb-bg;
+    border-bottom-color: $pb-red;
+    color: $pb-red;
+    text-shadow: $pb-text-glow;
+  }
+
+  .badge-primary,
+  .progress-bar,
+  .stash-id-pill span,
+  .modifier-options .modifier-option.selected,
+  .move-target,
+  .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: $pb-red;
+    border-color: $pb-red;
+  }
+
+  .progress-bar {
+    box-shadow: $pb-glow;
+  }
+
+  // no resume bar on cards
+  .grid-card .progress-bar {
+    display: none;
+  }
+
+  // scene page: the collapse bar beside the player stays dark
+  .scene-divider .btn,
+  .scene-divider .btn:hover,
+  .scene-divider .btn:focus,
+  .scene-divider .btn:not(:disabled):not(.disabled):active {
+    background-color: $pb-bg;
+    border-color: $pb-bg;
+    box-shadow: none;
+    color: $pb-muted;
+  }
+
+  .scene-divider .btn:hover {
+    color: $pb-red;
+  }
+
+  // settings: the section list on the left
+  .nav-pills .nav-link,
+  .nav-pills .nav-link:hover {
+    color: #fff;
+    text-shadow: none;
+  }
+
+  // home page: the featured carousel's studio and title, without a date
+  .featured-slide-link,
+  .featured-slide-link:hover {
+    color: #fff;
+    text-shadow: none;
+  }
+
+  .featured-slide-date {
+    display: none;
+  }
+
+  .featured-slide-info {
+    bottom: 3rem;
+
+    @media (max-width: 576px) {
+      bottom: 1.5rem;
+    }
+  }
+
+  .featured-slide-title {
+    font-size: 2.75rem;
+
+    @media (max-width: 576px) {
+      font-size: 1.8rem;
+    }
+  }
+
+  // the magnifier over image and gallery thumbnails has no box of its own
+  .preview-button .btn,
+  .preview-button .btn:hover,
+  .preview-button .btn:focus,
+  .preview-button .btn:not(:disabled):not(.disabled):active {
+    background: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  // scene page: the toolbar buttons sit on the page
+  .scene-toolbar {
+    .btn-secondary,
+    .btn-secondary:focus,
+    .btn-secondary:not(:disabled):not(.disabled):active,
+    .show > .btn-secondary.dropdown-toggle {
+      background-color: $pb-bg;
+      border-color: $pb-bg;
+      box-shadow: none;
+    }
+
+    .btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.06);
+      border-color: transparent;
+    }
+  }
+
+  .tag-item {
+    background-color: $pb-bg;
+    box-shadow: 0 0 0 1px $pb-line;
+    color: #fff;
+
+    a {
+      color: #fff;
+    }
+
+    .icon-wrapper,
+    .tag-icon {
+      color: $pb-muted;
+    }
+  }
+
+  .page-item.active .page-link {
+    background-color: $pb-red-dark;
+    border-color: $pb-red-dark;
+  }
+
+  input[type="range"] {
+    &::-webkit-slider-runnable-track,
+    &:focus::-webkit-slider-runnable-track {
+      background: $pb-red-dark;
+    }
+
+    &::-moz-range-track {
+      background: $pb-red-dark;
+    }
+
+    &::-webkit-slider-thumb {
+      background: $pb-red;
+      box-shadow: $pb-glow;
+    }
+
+    &::-moz-range-thumb {
+      background: $pb-red;
+      box-shadow: $pb-glow;
+    }
+  }
+
+  .double-range-slider {
+    &::-webkit-slider-thumb {
+      background-color: $pb-red;
+      border-color: $pb-red;
+    }
+
+    &::-moz-range-thumb {
+      background-color: $pb-red;
+      border-color: $pb-red;
+    }
+  }
+
+  // cards
+
+  .scene-card__description,
+  .image-card__description,
+  .gallery-card__description,
+  .group-card__description {
+    display: none;
+  }
+
+  .scene-card {
+    border: none;
+    box-shadow: none;
+  }
+
+  // The title sits over the foot of the thumbnail. The card becomes a
+  // one-column grid and its title section dissolves into it, so the title
+  // can share the thumbnail's cell. Clicks and hovers fall through it to
+  // the thumbnail, which links to the same scene and starts the preview.
+  .scene-card {
+    display: grid;
+    grid-template-columns: 100%;
+
+    .thumbnail-section {
+      grid-area: 1 / 1;
+    }
+
+    .card-section {
+      display: contents;
+    }
+
+    .card-section > a:first-child {
+      align-self: end;
+      background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.85));
+      grid-area: 1 / 1;
+      // matches the preview's own bottom margin
+      margin-bottom: 5px;
+      // the right side is left to the resolution and duration
+      padding: 2.5rem 7rem 0.8rem 1rem;
+      pointer-events: none;
+      position: relative;
+      transition: opacity 0.2s ease;
+      // over a golden card's flames, which burn over the thumbnail
+      z-index: 12;
+    }
+
+    .card-section-title {
+      margin-bottom: 0;
+      text-shadow: 0 1px 3px #000;
+    }
+
+    // no date row: the title is on the thumbnail, the counts follow it
+    .scene-card__details {
+      display: none;
+    }
+
+    // a golden card's fire glows brightest just here, and the gradient would
+    // cut a black band through it; its title carries its own glow instead
+    &.golden .card-section > a:first-child {
+      background: none;
+    }
+
+    // nor a rule between the thumbnail and the counts
+    &.golden hr {
+      display: none;
+    }
+
+    // The fire burns within the thumbnail and leaves the counts below on
+    // plain black. Pinned to the thumbnail's grid cell, each layer takes that
+    // cell rather than the whole card as the box it fills; the flames are
+    // clipped to it, since their feet are sunk past its foot.
+    &.golden::before,
+    &.golden::after,
+    .fire-surface,
+    .fire-flames,
+    .fire-embers {
+      // stops at the picture's foot, leaving the strip under it black
+      bottom: 5px;
+      // explicit end lines: on a positioned item an auto end means the
+      // card's own edge, not the end of the cell
+      grid-area: 1 / 1 / 2 / 2;
+    }
+
+    .fire-flames {
+      overflow: hidden;
+    }
+
+    // sunk less than in the full card, where the labels hid the cut
+    .fire-tongue {
+      transform: translateY(8%);
+    }
+
+    .fire-tongue:nth-child(2) {
+      transform: translateY(8%) scaleX(-1);
+    }
+
+    &.golden.awake {
+      // no burning rim and no glow thrown off the card
+      box-shadow: none;
+
+      &::before {
+        display: none;
+      }
+
+      // The thumbnail stops being one layer, so the preview alone sits under
+      // the flames while the studio, rating and specs come up over them.
+      .thumbnail-section {
+        z-index: auto;
+      }
+
+      .scene-card-preview {
+        z-index: 10;
+      }
+
+      .rating-banner,
+      .studio-overlay,
+      .scene-specs-overlay {
+        z-index: 12;
+      }
+    }
+
+    // out of the way once the preview takes over
+    .thumbnail-section:hover:has(.has-preview) ~ .card-section > a:first-child {
+      opacity: 0;
+      transition-delay: $scene-preview-delay;
+    }
+
+    // a golden card's preview waits for it to catch fire, and so does this
+    &.golden:not(.awake)
+      .thumbnail-section:hover:has(.has-preview)
+      ~ .card-section
+      > a:first-child {
+      opacity: 1;
+    }
+  }
+
+  .scene-card-preview.has-preview::after {
+    background-color: $pb-red;
+    box-shadow: $pb-glow;
+  }
+
+  // the card stays put on hover; only the thumbnail fades in
+  .hide-thumbnails .scene-card:hover,
+  .hide-thumbnails .scene-card:active {
+    background-color: $pb-bg;
+  }
+
+  // the count labels under a card: plain until hovered, then red
+  .card-popovers .btn,
+  .card-popovers .btn:focus,
+  .card-popovers .btn:not(:disabled):not(.disabled):active {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: #fff;
+  }
+
+  .card-popovers .btn:hover:not(:disabled) {
+    background-color: transparent;
+    color: $pb-red;
+    text-shadow: $pb-text-glow;
+  }
+}
+/* stylelint-enable selector-class-pattern */

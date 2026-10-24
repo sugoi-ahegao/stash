@@ -69,6 +69,9 @@ export const ScenePreview: React.FC<IScenePreviewProps> = React.memo(
     volume,
   }) => {
     const videoEl = useRef<HTMLVideoElement>(null);
+    // every scene is given a preview URL, generated or not, so whether one
+    // exists is only known once the video loads or fails
+    const [hasPreview, setHasPreview] = useState(false);
 
     useEffect(() => {
       const observer = new IntersectionObserver((entries) => {
@@ -91,7 +94,12 @@ export const ScenePreview: React.FC<IScenePreviewProps> = React.memo(
     }, [volume, soundActive]);
 
     return (
-      <div className={cx("scene-card-preview", { portrait: isPortrait })}>
+      <div
+        className={cx("scene-card-preview", {
+          portrait: isPortrait,
+          "has-preview": hasPreview,
+        })}
+      >
         <img
           className="scene-card-preview-image"
           loading="lazy"
@@ -107,6 +115,8 @@ export const ScenePreview: React.FC<IScenePreviewProps> = React.memo(
           preload="none"
           ref={videoEl}
           src={video}
+          onLoadedData={() => setHasPreview(true)}
+          onError={() => setHasPreview(false)}
         />
         <PreviewScrubber
           vttPath={vttPath}

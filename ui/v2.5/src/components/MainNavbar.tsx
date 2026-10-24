@@ -22,6 +22,7 @@ import { Icon } from "src/components/Shared/Icon";
 import { useConfigurationContext } from "src/hooks/Config";
 import { ManualStateContext } from "./Help/context";
 import { SettingsButton } from "./SettingsButton";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import {
   faBars,
   faChartColumn,
@@ -345,6 +346,7 @@ export const MainNavbar: React.FC = () => {
         >
           <SettingsButton />
         </NavLink>
+        <ThemeSwitcher />
         <Button
           className="nav-utility minimal"
           onClick={() => openManual()}

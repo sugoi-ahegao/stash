@@ -431,6 +431,24 @@ div.GalleryWall {
       @include galleryWidth(32vw);
     }
   }
+
+  &.zoom-4 .GalleryWallCard {
+    @media (min-width: 768px) {
+      @include galleryWidth(64vw);
+    }
+    @media (min-width: 1200px) {
+      @include galleryWidth(48vw);
+    }
+  }
+
+  &.zoom-5 .GalleryWallCard {
+    @media (min-width: 768px) {
+      @include galleryWidth(96vw);
+    }
+    @media (min-width: 1200px) {
+      @include galleryWidth(64vw);
+    }
+  }
 }
 
 .gallery-file-card.card {

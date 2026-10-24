@@ -80,12 +80,12 @@ interface IImageWallProps {
   selecting?: boolean;
 }
 
-const zoomWidths = [280, 340, 480, 640];
+const zoomWidths = [280, 340, 480, 640, 1000, 1900];
 const breakpointZoomHeights = [
-  { minWidth: 576, heights: [100, 120, 240, 360] },
-  { minWidth: 768, heights: [120, 160, 240, 480] },
-  { minWidth: 1200, heights: [120, 160, 240, 300] },
-  { minWidth: 1400, heights: [160, 240, 300, 480] },
+  { minWidth: 576, heights: [100, 120, 240, 360, 480, 600] },
+  { minWidth: 768, heights: [120, 160, 240, 480, 600, 720] },
+  { minWidth: 1200, heights: [120, 160, 240, 300, 400, 520] },
+  { minWidth: 1400, heights: [160, 240, 300, 480, 600, 720] },
 ];
 
 const ImageWall: React.FC<IImageWallProps> = ({

@@ -15,7 +15,7 @@ interface IPerformerCardGrid {
   extraCriteria?: IPerformerCardExtraCriteria;
 }
 
-const zoomWidths = [240, 300, 375, 470];
+const zoomWidths = [240, 300, 375, 470, 590, 740];
 
 export const PerformerCardGrid: React.FC<IPerformerCardGrid> = PatchComponent(
   "PerformerCardGrid",

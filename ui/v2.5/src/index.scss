@@ -39,6 +39,7 @@ $sidebar-width: 250px;
 @import "components/Dialogs/IdentifyDialog/styles.scss";
 @import "components/Dialogs/styles.scss";
 @import "flag-icons/css/flag-icons.min.css";
+@import "styles/themes/pb";
 
 /* stylelint-disable */
 #root {
@@ -557,6 +558,28 @@ textarea.text-input {
 
   .image-card-preview {
     height: 480px;
+  }
+}
+
+.zoom-4 {
+  .tag-card-image,
+  .gallery-card-image {
+    height: 600px;
+  }
+
+  .image-card-preview {
+    height: 600px;
+  }
+}
+
+.zoom-5 {
+  .tag-card-image,
+  .gallery-card-image {
+    height: 720px;
+  }
+
+  .image-card-preview {
+    height: 720px;
   }
 }
 

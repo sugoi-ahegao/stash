@@ -19,7 +19,7 @@ interface IGalleryCardGrid {
   ) => void;
 }
 
-const zoomWidths = [280, 340, 480, 640];
+const zoomWidths = [280, 340, 480, 640, 1000, 1900];
 
 export const GalleryCardGrid: React.FC<IGalleryCardGrid> = PatchComponent(
   "GalleryCardGrid",

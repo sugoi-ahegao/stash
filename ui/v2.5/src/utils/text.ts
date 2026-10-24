@@ -341,12 +341,22 @@ const RELATIVE_DATE_REGEX =
 // resolveRelativeDate parses expressions like "today", "today - 30 days" or
 // "now+2w" into a concrete Date, or returns null if the string isn't one of
 // these relative expressions.
+//
+// "today", "yesterday" and "tomorrow" name a day, so they resolve to its
+// midnight; only "now" carries the time. Resolving a day to the current
+// minute would also change the filter every minute: each re-render then asks
+// for a list the cache has never seen, and a list on screen refetches itself
+// whenever anything - recording a view, say - happens to re-render it.
 function resolveRelativeDate(input: string): Date | null {
   const match = input.trim().match(RELATIVE_DATE_REGEX);
   if (!match) return null;
 
   const [, base, sign, amountStr, unit] = match;
   const date = new Date();
+
+  if (base.toLowerCase() !== "now") {
+    date.setHours(0, 0, 0, 0);
+  }
 
   if (base.toLowerCase() === "yesterday") {
     date.setDate(date.getDate() - 1);

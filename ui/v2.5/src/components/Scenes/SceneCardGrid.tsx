@@ -19,7 +19,7 @@ interface ISceneCardGrid {
   view?: View;
 }
 
-const zoomWidths = [280, 340, 480, 640];
+const zoomWidths = [280, 340, 480, 640, 1000, 1900];
 
 export const SceneCardGrid: React.FC<ISceneCardGrid> = PatchComponent(
   "SceneCardGrid",

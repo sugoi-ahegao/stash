@@ -6,6 +6,10 @@ import { getClient } from "./core/StashService";
 import { baseURL, getPlatformURL } from "./core/createClient";
 import "./index.scss";
 import * as serviceWorker from "./serviceWorker";
+import { applyTheme, getStoredTheme } from "./utils/theme";
+
+// apply before the first render so the page never flashes the default theme
+applyTheme(getStoredTheme());
 
 ReactDOM.render(
   <>

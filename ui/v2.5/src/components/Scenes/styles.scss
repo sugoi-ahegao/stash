@@ -243,7 +243,13 @@ textarea.scene-description {
     &:hover,
     &:active {
       background-color: lighten($card-bg, 8%);
+    }
+  }
 
+  // only the thumbnail itself reveals the preview, not the title or labels
+  .scene-card .thumbnail-section {
+    &:hover,
+    &:active {
       .scene-card-preview-image,
       .scene-card-preview-video {
         opacity: 1;
@@ -261,6 +267,8 @@ textarea.scene-description {
     text-align: center;
   }
 }
+
+$scene-preview-delay: 1s;
 
 .scene-card,
 .scene-marker-card,
@@ -313,11 +321,52 @@ textarea.scene-description {
       opacity: 0.75;
       transition: opacity 0.5s;
     }
+  }
 
+  // the preview swaps in only after resting on the thumbnail a moment, so
+  // passing over a card on the way somewhere else leaves it alone
+  .thumbnail-section:hover,
+  .thumbnail-section:active {
     .scene-card-preview-video {
       top: 0;
-      transition-delay: 0.2s;
+      transition-delay: $scene-preview-delay;
     }
+
+    .scene-card-preview.has-preview::after {
+      animation: scene-preview-countdown $scene-preview-delay linear forwards;
+    }
+  }
+}
+
+// a bar run across the top of the thumbnail while the preview is pending,
+// gone the moment the preview takes over
+.scene-card-preview.has-preview::after {
+  background-color: $primary;
+  content: "";
+  height: 3px;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  width: 0;
+  z-index: 2;
+}
+
+@keyframes scene-preview-countdown {
+  0% {
+    opacity: 1;
+    width: 0;
+  }
+
+  99% {
+    opacity: 1;
+    width: 100%;
+  }
+
+  100% {
+    opacity: 0;
+    width: 100%;
   }
 }
 
@@ -1063,8 +1112,8 @@ input[type="range"].blue-slider {
  * The layers, back to front (SceneFire.tsx renders them):
  *
  *   .fire-surface     the charred ground the card sits on        z-index -1
- *   .fire-flames      the flames, rising from the bottom edge     z-index 9
- *   .thumbnail-section the preview, which the flame burns behind  z-index 10
+ *   .thumbnail-section the preview                                 z-index 10
+ *   .fire-flames      the flames, rising over the preview         z-index 11
  *   .fire-embers      sparks coming off the card                  z-index 12
  *   .card-section     the title, in front of its own fire         z-index 13
  *   &::before         the burning rim, and the glow it throws     z-index 14
@@ -1337,36 +1386,38 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
   // short on purpose: the clip is what reveals the flames, and a slow fade
   // over the top of it blurs the edge the wipe is meant to have
   transition: opacity 120ms ease-out;
-  z-index: 9;
+  z-index: 11;
 }
 
 // Two flames, one to each side, rooted below the card.
 //
-// A negative `bottom` sinks each flame's foot past the card's bottom edge,
-// where the card's own `overflow: hidden` cuts it off. That is deliberate:
-// the sprite's foot is a broad bright bulb, and hiding it leaves the part
-// that actually reads as fire while nothing is drawn outside the card.
+// Each flame is sunk an eighth of its own height past the card's bottom
+// edge, where the card's own `overflow: hidden` cuts it off. That is
+// deliberate: the sprite's foot is a broad bright bulb, and hiding it leaves
+// the part that actually reads as fire while nothing is drawn outside the
+// card.
 //
-// The height has to be bought back at the same time. Sinking a flame without
-// growing it spends the drawing's body on the clip and leaves only the thin
-// licks at the top of the cell showing, which read as sparks, not as fire.
+// The sprite's cells are 104x256, and drawn any taller than 160px they are
+// visibly upscaled, so that is the cap; below it the flame keeps to its share
+// of the card. The width follows the cell's own proportions, as stretching a
+// cell to some other box smears the drawing sideways.
 //
-// They also sit a layer below the preview, which is opaque, so a flame can
-// never cross it however tall it grows. There is one drawing, so the two are
-// told apart by mirroring the right-hand one, starting it on a different
-// frame, and running it at its own speed.
+// They burn over the preview, though under the title. There is one drawing,
+// so the two are told apart by mirroring the right-hand one, starting it on a
+// different frame, and running it at its own speed.
 .fire-tongue {
   animation-iteration-count: infinite;
   animation-name: fire-sprite;
   animation-timing-function: steps(10);
+  aspect-ratio: 104 / 256;
   background-image: url("./flames.png");
   background-repeat: no-repeat;
   background-size: 1000% 100%;
-  bottom: -6%;
+  bottom: 0;
   filter: drop-shadow(0 0 6px rgba(255, 96, 20, 0.45));
-  height: 46%;
+  height: min(46%, 160px);
   position: absolute;
-  width: 18%;
+  transform: translateY(13%);
 
   &:nth-child(1) {
     animation-delay: -0.2s;
@@ -1377,8 +1428,8 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
   &:nth-child(2) {
     animation-delay: -0.95s;
     animation-duration: 1.8s;
-    left: 79%;
-    transform: scaleX(-1);
+    right: 3%;
+    transform: translateY(13%) scaleX(-1);
   }
 }
 
@@ -1594,11 +1645,11 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
       opacity: 1;
     }
 
-    // Above the flame, which is what keeps fire off the preview. Nothing else
+    // Lifted over the charred stock, with the flames above it. Nothing else
     // is done to it: no inset, no frame, no background. Any part of this box
     // the preview does not cover - the letterboxing on a portrait scene, the
     // strip under a short preview - shows the charred stock like the rest of
-    // the card rather than a black panel, and the flames stop well below it.
+    // the card rather than a black panel.
     .thumbnail-section {
       position: relative;
       z-index: 10;
@@ -1633,6 +1684,47 @@ $fire-ember-delay: 700ms; // sparks, once there is a fire to throw them
     hr {
       border-top-color: rgba(255, 120, 40, 0.25);
     }
+  }
+}
+
+// A golden card is discovered by catching fire, so until it has, its preview
+// holds off - countdown and all - rather than taking over first and hiding
+// the ignition. Once alight, the usual countdown runs from that moment.
+.scene-card.golden:not(.awake) .thumbnail-section:hover {
+  // both: with thumbnails hidden the preview is revealed by its opacity,
+  // which would otherwise finish fading in while it waits off-card
+  .scene-card-preview-video {
+    opacity: 0;
+    top: -9999px;
+  }
+
+  .scene-card-preview.has-preview::after {
+    animation: none;
+  }
+}
+
+// The preview is what the hover is for: once it takes over, the flames and
+// sparks burning over it make way, and come back when the cursor leaves.
+//
+// This matches from the instant the card wakes if the cursor is already on
+// the thumbnail, so it hides with visibility rather than opacity: the fire's
+// own fade-in runs on opacity, and contending for it would park the flames
+// half-lit for the whole delay. Each keeps its own opacity timing.
+.scene-card.golden.awake:has(.thumbnail-section:hover .has-preview) {
+  .fire-flames,
+  .fire-embers {
+    transition-property: opacity, visibility;
+    visibility: hidden;
+  }
+
+  .fire-flames {
+    transition-delay: $fire-burst-delay, $scene-preview-delay;
+    transition-duration: 120ms, 0s;
+  }
+
+  .fire-embers {
+    transition-delay: $fire-ember-delay, $scene-preview-delay;
+    transition-duration: $fire-settle-duration, 0s;
   }
 }
 
