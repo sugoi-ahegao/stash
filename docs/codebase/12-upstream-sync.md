@@ -86,8 +86,8 @@ and that `appSchemaVersion` names upstream's last migration.
 ## Syncing, step by step
 
 ```
-  main checkout (clean)                     ~/projects/stash.upstream-sync-<date>/
-  ─────────────────────                     ──────────────────────────────────────
+  main checkout (clean)                     stash.worktrees/upstream-sync-<date>/
+  ─────────────────────                     ─────────────────────────────────────
   scripts/upstream-sync start  ──────────►  branch upstream-sync/<date>, from your branch
                                             git merge --no-commit upstream/develop
                                             generated files settled (below)

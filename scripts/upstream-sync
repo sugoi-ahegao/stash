@@ -177,8 +177,9 @@ cmd_start() {
 	base="$(git -C "$MAIN_CHECKOUT" branch --show-current)"
 	[[ -n "$base" ]] || die "the main checkout isn't on a branch"
 	branch="upstream-sync/$(date +%Y%m%d)"
-	# where worktrunk puts it, so wt list/switch/remove see it as one of theirs
-	wt="$(dirname "$MAIN_CHECKOUT")/$(basename "$MAIN_CHECKOUT").$(slug "$branch")"
+	# where worktrunk puts it (worktree-path in ~/.config/worktrunk/config.toml): beside the
+	# main checkout, named after the branch
+	wt="$(dirname "$MAIN_CHECKOUT")/$(slug "$branch")"
 	git -C "$MAIN_CHECKOUT" rev-parse -q --verify "refs/heads/$branch" >/dev/null &&
 		die "branch $branch already exists (finish it, or delete it and its worktree $wt)"
 	[[ $(git -C "$MAIN_CHECKOUT" rev-list --count "$base..$UPSTREAM_REF") != 0 ]] ||

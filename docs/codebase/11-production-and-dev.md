@@ -13,12 +13,12 @@ run the worktrees.
         ▲
         │  code only     scripts/prod ship
         │
-  DEV          ~/projects/stash/.local/          make server-start
+  DEV          stash.worktrees/stash/.local/     make server-start
                                                               port 9998   DLNA off
         │                                                     parallel_tasks 1
         │  data only     scripts/prod pull-data   (production ──► dev)
         ▼
-  WORKTREES    ~/projects/stash.<branch>/.local/  wt switch -c <branch>
+  WORKTREES    stash.worktrees/<branch>/.local/  wt switch -c <branch>
                                                               port 9997…  DLNA off
 ```
 
@@ -56,11 +56,12 @@ shortcut, and no dependency on a WSL terminal being open.
     stash.log                      logfile
     shipped                        "<commit> <branch> [(+ uncommitted changes)]"
 
-  ~/projects/stash/.local/         dev
-    config.yml  stash-go.sqlite  generated/  blobs/  cache/
+  ~/projects/stash.worktrees/
+    stash/.local/                  dev (the main checkout)
+      config.yml  stash-go.sqlite  generated/  blobs/  cache/
 
-  ~/projects/stash.<branch>/       worktree (wt switch -c <branch>)
-    .local/                        its own copy: config.yml  stash-go.sqlite  generated/ …
+    <branch>/                      worktree (wt switch -c <branch>)
+      .local/                      its own copy: config.yml  stash-go.sqlite  generated/ …
 ```
 
 Each of the three has **its own database** and **its own `generated/` and `blobs/`**.
@@ -81,7 +82,7 @@ changing only:
 | `port` | 9999 | 9998 |
 | `dlna.default_enabled` | true | false |
 | `parallel_tasks` | 3 | 1 |
-| data paths (`database`, `generated`, …) | `C:\Users\Pranav\.stash\…` | `~/projects/stash/.local/…` |
+| data paths (`database`, `generated`, …) | `C:\Users\Pranav\.stash\…` | `~/projects/stash.worktrees/stash/.local/…` |
 | library roots (`stash:`) | `D:\sys.tmp\…` | `/mnt/d/sys.tmp/…` |
 | `ui_location`, `logfile` | set | unset |
 
@@ -245,7 +246,10 @@ pool when their worktree is removed. The server port is `port:` in `.local/confi
 The UI port is `STASH_UI_PORT` in `.env.development.local`, which `vite.config.js` reads
 (`strictPort`, so a taken port fails loudly instead of drifting to the next one).
 
-Worktrees live beside the main checkout, at `~/projects/stash.<branch>` (`/` becomes `-`).
+Every checkout lives in `~/projects/stash.worktrees/`: the main checkout is `stash/`, and
+each worktree sits beside it, named after its branch (`/` becomes `-`). That's
+`worktree-path` under `[projects."github.com/sugoi-ahegao/stash"]` in
+`~/.config/worktrunk/config.toml`; `scripts/upstream-sync` assumes the same layout.
 The hooks run the main checkout's `scripts/worktree`, so branches made before the script
 existed still get it.
 
@@ -266,7 +270,7 @@ How the copy is made, and why it's safe:
 in dev deletes the real video.
 
 To try a worktree's code on the real library, ship from it:
-`cd ~/projects/stash.idea-x && ~/projects/stash/scripts/prod ship`. `scripts/prod`
+`cd ~/projects/stash.worktrees/idea-x && ../stash/scripts/prod ship`. `scripts/prod`
 ships whichever checkout it's run from (`git rev-parse --show-toplevel`), so the main
 checkout's copy works even if the branch doesn't have the script. Mind the migration rule
 above.
