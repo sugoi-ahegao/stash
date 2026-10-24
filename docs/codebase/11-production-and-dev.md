@@ -141,7 +141,7 @@ including uncommitted changes. It compares that against the commit recorded in
   every changed file under ui/v2.5/ ?
      │
      ├─ yes ──► UI-only    build the UI, copy it into .stash\ui
-     │                     no restart; reload the page          ~25 s
+     │                     restart stash.exe (seconds down)     ~25 s
      │
      └─ no  ──► full       build UI + stash.exe  (production still up)
                            stop stash.exe  ─┐
@@ -149,10 +149,11 @@ including uncommitted changes. It compares that against the commit recorded in
                            start stash.exe ─┘                    ~3 min
 ```
 
-The UI-only path works because production serves its UI from `ui_location`
-(`internal/api/server.go:249`) instead of the copy embedded in the binary. The copy writes
-the new hashed assets first, then `index.html`, then prunes old assets, so a page loaded
-mid-ship never references a missing file.
+The UI-only path skips rebuilding stash.exe because production serves its UI from
+`ui_location` (`internal/api/server.go:249`) instead of the copy embedded in the binary.
+It still restarts stash.exe: that folder is served by statigz, which indexes it once at
+startup (`statigz.FileServer`), so new hashed assets 404 until the next start - the page
+loads, but blank. Skipping the restart is what took production's UI down on 2026-10-24.
 
 Stopping asks stash to close, then forces it after 10 seconds. There is no shutdown
 mutation; SQLite is crash-safe if the force is needed.

@@ -11,7 +11,9 @@
 #
 # .stash is stash's default config location, so stash.exe needs no arguments: it can be
 # started from a shortcut, the tray, or `stash` on the command line. The UI is served from
-# .stash\ui (ui_location), so a UI-only change ships by copying files, with no restart.
+# .stash\ui (ui_location), so a UI-only change ships without rebuilding stash.exe. It still
+# restarts it: the UI is served by statigz, which indexes the folder once at startup, so
+# the freshly hashed assets would 404 until the next start.
 #
 # Requires the mingw-w64 cross compiler: sudo apt install gcc-mingw-w64-x86-64
 
@@ -178,9 +180,12 @@ cmd_ship() {
 	info "Shipping $(git -C "$REPO" branch --show-current) @ $(git -C "$REPO" rev-parse --short HEAD) from $REPO"
 	case $mode in
 	--ui)
-		info "UI-only change: no restart needed"
+		info "UI-only change: no stash.exe rebuild"
 		build_ui
 		install_ui
+		# statigz indexes the UI folder at startup, so the new assets only serve after a
+		# restart; the start below brings it back up
+		stop_prod
 		;;
 	full | --full)
 		build_ui
@@ -350,8 +355,8 @@ Production stash: native Windows stash.exe in $PROD
                                 add shortcuts, and start it
   scripts/prod ship [--ui|--full]
                                 ship this checkout to production. UI-only changes are
-                                copied in without a restart; anything else rebuilds
-                                stash.exe and restarts it
+                                copied in without rebuilding stash.exe; anything else
+                                rebuilds it. Either way stash.exe restarts
   scripts/prod pull-data        replace the dev library with a copy of production's
   scripts/prod status           what production runs, and how far this checkout differs
   scripts/prod start|stop|logs
