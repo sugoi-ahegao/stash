@@ -13,6 +13,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 ## 2026-10-24
 
 - **upstream sync**: merged stashapp/stash `develop` at `bdee3c83` (44 upstream commits) `8cf477772`. What they changed is in upstream's changelog, not here
+- feat(ui): instant view eye, shut until viewed today, and mark a page viewed `0330a155c`
 - feat(ui): library settings for the featured group, golden tag and intake folder `38fa82a5d`
 - feat(ui): theme switcher, the pb theme, and scene card previews `cd5271aa7`
 - feat(scripts): add dev, to run this checkout's backend and UI `4a9e63b30`
