@@ -21,6 +21,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - feat(scripts): add upstream-sync, and document keeping up with upstream `7726f769d`
 - fix(scripts): restart production after a UI-only ship `9a9c23c24`
 - fix(sqlite): track fork migrations in their own table `c77c887cc`
+- tune(ui): pb theme darkens dropdown menus and modals `f18849aaf`
 - tune(ui): task queue header matches the pb background `3117696a6`
 - refactor(sqlite,api): move view history into fork-owned files `71bf7466d`
 - refactor(scripts): drop preview worktrees from dev `a441988bb`
