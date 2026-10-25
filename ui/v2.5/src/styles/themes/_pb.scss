@@ -63,6 +63,9 @@ html[data-theme="pb"] {
   .table-list thead,
   .package-manager table thead,
   .modal-content,
+  .modal-header,
+  .modal-body,
+  .modal-footer,
   .toast,
   .list-group-item {
     background-color: $pb-surface;
@@ -73,8 +76,6 @@ html[data-theme="pb"] {
     box-shadow: 0 0 0 1px $pb-line;
   }
 
-  .bg-secondary,
-  .bg-dark,
   .popover,
   .popover-body,
   div.dropdown-menu,
@@ -136,6 +137,23 @@ html[data-theme="pb"] {
   .dropdown-item:hover {
     background-color: rgba(255, 31, 61, 0.12);
   }
+
+  // Bootstrap's bg-* utilities are !important, and menus and their items carry them
+  /* stylelint-disable declaration-no-important */
+  .bg-secondary,
+  .bg-dark {
+    background-color: $pb-raised !important;
+  }
+
+  .dropdown-item.bg-secondary {
+    background-color: transparent !important;
+  }
+
+  .dropdown-item.bg-secondary:focus,
+  .dropdown-item.bg-secondary:hover {
+    background-color: rgba(255, 31, 61, 0.12) !important;
+  }
+  /* stylelint-enable declaration-no-important */
 
   .react-select__option--is-selected,
   .dropdown-item.active,
