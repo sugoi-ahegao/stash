@@ -336,6 +336,8 @@ type Mutation {
   sceneDeleteView(id: ID!, times: [Timestamp!]): HistoryMutationResult!
   "Resets the view count for a scene to 0. Returns the new view count value."
   sceneResetViewCount(id: ID!): Int!
+  "Records a view of each scene at the current time. Returns the scenes."
+  scenesAddView(ids: [ID!]!): [Scene!]!
 
   "Generates screenshot at specified time in seconds. Leave empty to generate default screenshot"
   sceneGenerateScreenshot(id: ID!, at: Float): ID!

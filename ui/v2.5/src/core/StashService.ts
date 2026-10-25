@@ -1070,6 +1070,11 @@ export const useSceneAddView = (evictLists = false) =>
     },
   });
 
+// Returns the scenes, so their view_count and last_viewed_at land in the cache
+// by normalisation; nothing to write by hand. Like useSceneAddView, it leaves
+// the lists alone so the grid isn't swapped for a spinner.
+export const useScenesAddView = () => GQL.useScenesAddViewMutation();
+
 export const useSceneDeleteView = () =>
   GQL.useSceneDeleteViewMutation({
     update(cache, result, { variables }) {

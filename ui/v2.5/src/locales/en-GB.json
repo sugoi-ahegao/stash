@@ -79,6 +79,8 @@
     "load_filter": "Load filter",
     "logout": "Log out",
     "make_primary": "Make Primary",
+    "mark_page_viewed": "Mark page as viewed",
+    "mark_selected_viewed": "Mark selected as viewed",
     "merge": "Merge",
     "migrate_blobs": "Migrate blobs",
     "migrate_scene_screenshots": "Migrate scene screenshots",
@@ -164,7 +166,8 @@
     "unset": "Unset",
     "use_default": "Use default",
     "view_history": "View history",
-    "view_random": "View Random"
+    "view_random": "View Random",
+    "viewed_today": "Viewed today"
   },
   "actions_name": "Actions",
   "age": "Age",

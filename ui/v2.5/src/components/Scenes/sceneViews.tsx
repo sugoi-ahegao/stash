@@ -1,6 +1,8 @@
 import React, { useCallback, useContext, useEffect, useRef } from "react";
-import { useSceneAddView } from "src/core/StashService";
+import { useSceneAddView, useScenesAddView } from "src/core/StashService";
 import { useForkConfig, ViewOnHoverPage } from "src/core/forkConfig";
+import { useToast } from "src/hooks/Toast";
+import { viewedToday } from "src/core/viewed";
 
 // The ways the UI records that a scene was seen, besides the mark-viewed
 // button (MarkViewedButton.tsx):
@@ -8,6 +10,8 @@ import { useForkConfig, ViewOnHoverPage } from "src/core/forkConfig";
 //   - opening the scene page: useViewOnOpen
 //   - resting the cursor on a scene card, on the pages whose setting turns it
 //     on: ViewOnHover around the page, useDwellView in the card
+//   - "Mark page as viewed" in a scene list's operations menu:
+//     useMarkScenesViewed
 //
 // A view is not a play: it never touches play count, play duration or resume
 // time. See docs/decisions/0004-views-apart-from-plays.md. Turning off "track
@@ -82,4 +86,46 @@ export function useDwellView(sceneID: string): IHoverHandlers {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return enabled ? { onMouseEnter, onMouseLeave } : {};
+}
+
+// Marks a batch of scenes viewed by hand - a scene list's page, or its
+// selection - in one request. Scenes already viewed today are left alone, as
+// the eye button leaves them. The cards' eyes open at once rather than when
+// the server answers: the optimistic reply stands in until the real one
+// replaces it, and is rolled back if the request fails.
+export function useMarkScenesViewed() {
+  const Toast = useToast();
+  const [addViews] = useScenesAddView();
+
+  return useCallback(
+    async (
+      batch: {
+        id: string;
+        view_count?: number | null;
+        last_viewed_at?: string | null;
+      }[]
+    ) => {
+      const scenes = batch.filter((s) => !viewedToday(s.last_viewed_at));
+      if (scenes.length === 0) return;
+
+      const now = new Date().toISOString();
+
+      try {
+        await addViews({
+          variables: { ids: scenes.map((s) => s.id) },
+          optimisticResponse: {
+            scenesAddView: scenes.map((s) => ({
+              __typename: "Scene",
+              id: s.id,
+              view_count: (s.view_count ?? 0) + 1,
+              last_viewed_at: now,
+            })),
+          },
+        });
+      } catch (e) {
+        Toast.error(e);
+      }
+    },
+    [addViews, Toast]
+  );
 }

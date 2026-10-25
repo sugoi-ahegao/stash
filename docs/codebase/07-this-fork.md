@@ -429,11 +429,17 @@ a scene recorded a *play* and the player's own increment was disabled. That's go
     ViewOnHover + useDwellView     cursor on a card for hoverViewDelay (3 s), once per
                                    card, on the pages whose setting is on. Landing.tsx and
                                    Scenes.tsx wrap their lists in <ViewOnHover page=…>
-  Scenes/MarkViewedButton.tsx      the eye button: marked by hand, lit while the last
-                                   view falls on today
+  Scenes/MarkViewedButton.tsx      the eye button: marked by hand. Shut (eye-slash)
+                                   until the last view falls on today, open after;
+                                   opens on click, not on the server's reply;
+                                   inert while open
+    useMarkScenesViewed            "Mark page as viewed" (or "…selected…") in a scene
+                                   list's operations menu, so the Scenes and landing
+                                   pages: one scenesAddView(ids), optimistic,
+                                   skipping scenes already viewed today
         │      all of them off when the player's "track activity" setting is
         ▼
-  sceneAddView(id)  ──►  scenes_viewed_dates   (fork migration 1)
+  sceneAddView(id) / scenesAddView(ids)  ──►  scenes_viewed_dates   (fork migration 1)
                          view_history · view_count · last_viewed_at on Scene,
                          filters + sorts, sceneDeleteView / sceneResetViewCount
 

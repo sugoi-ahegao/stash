@@ -17,6 +17,7 @@ import { GenerateDialog } from "../Dialogs/GenerateDialog";
 import { ExportDialog } from "../Shared/ExportDialog";
 import { SceneCardGrid } from "./SceneCardGrid";
 import { useShowThumbnails } from "../List/ThumbnailToggle";
+import { useMarkScenesViewed } from "./sceneViews";
 import { TaggerContext } from "../Tagger/context";
 import { IdentifyDialog } from "../Dialogs/IdentifyDialog/IdentifyDialog";
 import { useConfigurationContext } from "src/hooks/Config";
@@ -415,6 +416,7 @@ export const FilteredSceneList = PatchComponent(
     const { modal, showModal, closeModal } = modalState;
 
     const [showThumbnails, setShowThumbnails] = useShowThumbnails(view); // fork
+    const markViewed = useMarkScenesViewed(); // fork
 
     // Utility hooks
     const { setPage, removeCriterion, clearAllCriteria } = useFilterOperations({
@@ -582,6 +584,16 @@ export const FilteredSceneList = PatchComponent(
         text: intl.formatMessage({ id: "actions.invert_selection" }),
         onClick: () => onInvertSelection(),
         isDisplayed: () => totalCount > 0,
+      },
+      // fork: the selection if there is one, otherwise the page
+      {
+        text: intl.formatMessage({
+          id: hasSelection
+            ? "actions.mark_selected_viewed"
+            : "actions.mark_page_viewed",
+        }),
+        onClick: () => markViewed(hasSelection ? selectedItems : items),
+        isDisplayed: () => items.length > 0,
       },
       {
         text: intl.formatMessage({ id: "actions.play_random" }),

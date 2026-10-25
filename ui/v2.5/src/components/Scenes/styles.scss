@@ -199,8 +199,8 @@ textarea.scene-description {
 }
 
 // One-click "mark as viewed", sat in the card's count row beside the tag
-// and performer buttons. It stays green for the rest of the day once the
-// scene has been viewed, since the card shows no view count to tick over.
+// and performer buttons. Its eye is shut until the scene has been viewed
+// today and open for the rest of the day after (MarkViewedButton.tsx).
 //
 // The other entries in this row are wrapped in a popover or a nested button
 // group, so bootstrap's `.btn-group > .btn { flex: 1 1 auto }` catches only
@@ -208,7 +208,6 @@ textarea.scene-description {
 // middle. Overriding that needs to outweigh two classes, hence .btn here.
 .card-popovers .btn.mark-viewed-button {
   flex: 0 0 auto;
-  transition: color 0.2s ease;
 
   // the row's icons are followed by a count, so they carry a right margin.
   // This one stands alone and would sit off-centre with it.
@@ -216,9 +215,20 @@ textarea.scene-description {
     margin-right: 0;
   }
 
-  // lit while the scene's last view falls on today
+  // nothing to do once viewed today, so it looks inert too: no hover or
+  // press feedback. Not :disabled, which would let the click through to the
+  // card behind it. Themes that colour the row on hover undo it themselves
+  // (themes/_pb.scss).
   &.viewed-today {
-    color: #5cb85c;
+    cursor: default;
+
+    &:hover,
+    &:focus,
+    &:active {
+      background: none;
+      box-shadow: none;
+      color: $text-color;
+    }
   }
 }
 

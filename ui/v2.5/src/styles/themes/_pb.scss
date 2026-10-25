@@ -548,5 +548,11 @@ html[data-theme="pb"] {
     color: $pb-red;
     text-shadow: $pb-text-glow;
   }
+
+  // except the eye once the scene's been viewed today: it does nothing then
+  .card-popovers .btn.mark-viewed-button.viewed-today:hover {
+    color: #fff;
+    text-shadow: none;
+  }
 }
 /* stylelint-enable selector-class-pattern */

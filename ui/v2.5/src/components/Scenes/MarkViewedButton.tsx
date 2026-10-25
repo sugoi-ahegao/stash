@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "react-bootstrap";
 import cx from "classnames";
 import { useIntl } from "react-intl";
-import { faEye } from "@fortawesome/free-solid-svg-icons";
+import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { useSceneAddView } from "src/core/StashService";
 import { viewedToday } from "src/core/viewed";
 import { useToast } from "src/hooks/Toast";
@@ -14,9 +14,12 @@ import { Icon } from "../Shared/Icon";
 //
 // A view is not a play - it never touches play count or play duration.
 //
-// It lights up while the scene's last view falls on today, which needs no
-// local state: the mutation writes last_viewed_at into the cache, so the
-// button reads its own result back and stays lit until midnight.
+// The eye is open while the scene's last view falls on today and shut
+// otherwise. That needs no stored state: the mutation writes last_viewed_at
+// into the cache, so the button reads its own result back and stays open
+// until midnight. It opens on click rather than on the reply, which can take
+// a while from a busy server, and shuts again if the request fails. While
+// open, clicking it does nothing.
 export const MarkViewedButton: React.FC<{
   sceneID: string;
   lastViewedAt?: string | null;
@@ -31,19 +34,26 @@ export const MarkViewedButton: React.FC<{
     // spinner and drop the card being clicked. See useSceneAddView.
     const [addView] = useSceneAddView();
 
-    const viewedTodayNow = viewedToday(lastViewedAt);
+    // clicked, and the server hasn't answered yet
+    const [pending, setPending] = useState(false);
+
+    const viewedTodayNow = pending || viewedToday(lastViewedAt);
 
     async function onClick(event: React.MouseEvent) {
       // the card behind the button navigates and selects
       event.preventDefault();
       event.stopPropagation();
 
-      if (disabled) return;
+      // a second view the same day would only pad the history
+      if (disabled || viewedTodayNow) return;
 
+      setPending(true);
       try {
         await addView({ variables: { id: sceneID } });
       } catch (e) {
         Toast.error(e);
+      } finally {
+        setPending(false);
       }
     }
 
@@ -53,10 +63,12 @@ export const MarkViewedButton: React.FC<{
         className={cx("minimal", "mark-viewed-button", {
           "viewed-today": viewedTodayNow,
         })}
-        title={intl.formatMessage({ id: "actions.add_view" })}
+        title={intl.formatMessage({
+          id: viewedTodayNow ? "actions.viewed_today" : "actions.add_view",
+        })}
         onClick={onClick}
       >
-        <Icon icon={faEye} />
+        <Icon icon={viewedTodayNow ? faEye : faEyeSlash} />
       </Button>
     );
   }

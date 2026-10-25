@@ -71,6 +71,14 @@ mutation SceneAddView($id: ID!, $times: [Timestamp!]) {
   }
 }
 
+mutation ScenesAddView($ids: [ID!]!) {
+  scenesAddView(ids: $ids) {
+    id
+    view_count
+    last_viewed_at
+  }
+}
+
 mutation SceneDeleteView($id: ID!, $times: [Timestamp!]) {
   sceneDeleteView(id: $id, times: $times) {
     count
