@@ -12,9 +12,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 ## 2026-11-02
 
-- feat(ui): featured carousel hold follows the pointer `9ea40dcc7`
-- feat(ui): hold to generate lets go cleanly and follows the pointer `f0a81adf1`
-- feat(ui): hold a scene card to generate a fresh preview `ef5b86f95`
+- feat(ui): hold a scene card to generate a fresh preview `124ba8d51`
 
 ## 2026-10-24
 
