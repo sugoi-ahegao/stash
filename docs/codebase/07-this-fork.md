@@ -63,6 +63,8 @@ upstream commits had no server-side conflicts.
   NEW  core/golden.ts, Scenes/GoldenCard.tsx,    golden cards (Feature 6)
        Scenes/golden-card.scss, Scenes/flames.png,
        ui/v2.5/scripts/build_flame_sprite.py
+  NEW  Scenes/HoldToGenerate.tsx,               hold a scene card's thumbnail 5s to
+       Scenes/hold-to-generate.scss               generate, with a fresh preview
   NEW  components/ThemeSwitcher.tsx,             theme switcher in the navbar: Blueprint
        utils/theme.ts, styles/themes/_pb.scss    (default) and pb, per browser
   NEW  List/ThumbnailToggle.tsx                 thumbnail visibility toggle
@@ -542,6 +544,47 @@ widths, so leaving `bg-dark` there reintroduces the strip in the expanded menu o
 `.featured-slide` in `Landing/styles.scss`. `105vh` deliberately overflowed the viewport
 so the slide never showed a seam; `96vh` instead leaves the top of the next section
 visible as a scroll affordance. Anything at or above `100vh` will hide it again.
+
+### Hold a scene card to generate
+
+Pressing and holding a scene card's thumbnail for 5 seconds (`holdDuration` in
+`Scenes/HoldToGenerate.tsx`) generates for that scene. It works wherever `SceneCard` is
+used: the Scenes page, a group's scenes, a performer's, the landing page. The pointer can
+wander anywhere over the card mid-hold (the press is followed on the window, and the
+browser's own link drag is held off); leaving the card, releasing early, or selecting cards
+cancels it. Letting go before the dial
+appears (`revealDelay`, 350 ms, a little under the platforms' long-press threshold, so a
+slow click is still a click) opens the scene. Once the dial is showing, letting go is a hold
+given up on: the ring drains back from where it got to and fades, and nothing happens. Its
+click is swallowed, like the one that ends a completed hold.
+
+It queues two jobs, preview first so it runs first:
+
+1. the preview (and the webp, if the generate defaults make one) **with overwrite**, its
+   segments slid to new positions;
+2. everything else the generate defaults (Settings → Tasks → Generate) turn on, without
+   overwrite, so it only fills in what's missing.
+
+**Why the preview comes out different.** Segment *i* starts at
+`excludeStart + i × step`. `slidPreviewOptions` adds a random part of a step to
+`previewExcludeStart` and takes the same amount off `previewExcludeEnd`, so the step stays
+the same and every segment moves. The end can go negative: the server only subtracts it
+(`getStepSizeAndOffset` in `pkg/scene/generate/preview.go`). The slide is capped so the
+last segment still ends before the video does. A scene too short for segments gets one
+whole-scene preview, which nothing can slide, so it comes out the same.
+
+The preview's URL doesn't change, so a card that has already loaded it would keep the old
+one. When the preview job finishes, `bumpPreviewVersion` gives the scene a new version, and
+every card showing that scene adds `?v=N` to the URL and remounts its preview. The
+parameter isn't `t`, because `t` makes the server mark the response immutable.
+
+After the blast, a glowing gear stays in the middle of the thumbnail until the preview job
+is done: dim and turning slowly while it's queued, faster once it runs. Then it becomes a
+check, or a cross if the job failed, and fades.
+
+The animation's colours are `--hold-*` custom properties: Blueprint's by default, pb's
+from `styles/themes/_pb.scss`, which also fades out pb's on-thumbnail title during a hold so
+it doesn't cover the badge.
 
 ---
 

@@ -223,6 +223,8 @@
   position: absolute;
   right: 0;
   top: 0;
+  // a finger held and dragged on the glass is a hold, not a scroll
+  touch-action: none;
   z-index: 4;
 
   // today's unlock limit has been reached - still visible, just not

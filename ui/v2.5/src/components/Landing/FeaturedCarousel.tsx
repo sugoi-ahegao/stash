@@ -60,9 +60,53 @@ const SlideGlass: React.FC<{
   onHoldStart: () => void;
   onHoldEnd: () => void;
 }> = ({ holding, locked, onHoldStart, onHoldEnd }) => {
-  function startHold(e: React.SyntheticEvent) {
+  // removes the window listeners that follow the pointer during a hold
+  const stopTracking = useRef<() => void>();
+
+  function endHold() {
+    stopTracking.current?.();
+    stopTracking.current = undefined;
+    onHoldEnd();
+  }
+
+  useEffect(() => () => stopTracking.current?.(), []);
+
+  // The hold is followed on the window rather than on the glass, the way a
+  // scene card's hold to generate is (Scenes/HoldToGenerate.tsx): dragging
+  // anywhere over the slide - across the arrows included - keeps it going, a
+  // release anywhere ends it, and leaving the slide gives it up.
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.button !== 0 || !e.isPrimary) return;
+    // no text selection, no native drag, and no swipe for react-slick
     e.preventDefault();
     e.stopPropagation();
+
+    stopTracking.current?.();
+    const pointerId = e.pointerId;
+    const slide = e.currentTarget.closest(".featured-slide") ?? e.currentTarget;
+
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const r = slide.getBoundingClientRect();
+      const inside =
+        ev.clientX >= r.left &&
+        ev.clientX <= r.right &&
+        ev.clientY >= r.top &&
+        ev.clientY <= r.bottom;
+      if (!inside) endHold();
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId === pointerId) endHold();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    stopTracking.current = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+
     onHoldStart();
   }
 
@@ -74,14 +118,12 @@ const SlideGlass: React.FC<{
       })}
       role="button"
       tabIndex={0}
-      onMouseDown={startHold}
-      onMouseUp={onHoldEnd}
-      onMouseLeave={onHoldEnd}
-      onTouchStart={startHold}
-      onTouchEnd={onHoldEnd}
-      onTouchCancel={onHoldEnd}
+      onPointerDown={onPointerDown}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !e.repeat) startHold(e);
+        if ((e.key === "Enter" || e.key === " ") && !e.repeat) {
+          e.preventDefault();
+          onHoldStart();
+        }
       }}
       onKeyUp={(e) => {
         if (e.key === "Enter" || e.key === " ") onHoldEnd();

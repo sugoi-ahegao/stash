@@ -573,5 +573,28 @@ html[data-theme="pb"] {
     color: #fff;
     text-shadow: none;
   }
+
+  // hold to generate (Scenes/hold-to-generate.scss): the charge glows red
+  // on black like the rest of the theme, and "done" is white light rather
+  // than a green the theme never uses. A failure shows its cross in grey.
+  .hold-generate {
+    --hold-accent: #{$pb-red};
+    --hold-accent-deep: #{$pb-red-dark};
+    --hold-hot: #fff2f4;
+    --hold-shade: #{$pb-bg};
+    --hold-surface: #{rgba($pb-bg, 0.85)};
+    --hold-done: #{$pb-text};
+    --hold-failed: #{$pb-muted};
+    --hold-text: #{$pb-text};
+  }
+
+  // the title over the foot of the thumbnail steps aside while a hold
+  // charges, leaving the picture to the dial
+  .scene-card:has(.hold-charging)
+    .card-section
+    > a:first-child {
+    opacity: 0;
+    transition-delay: 0s;
+  }
 }
 /* stylelint-enable selector-class-pattern */

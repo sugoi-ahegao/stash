@@ -10,6 +10,12 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-02
+
+- feat(ui): featured carousel hold follows the pointer `9ea40dcc7`
+- feat(ui): hold to generate lets go cleanly and follows the pointer `f0a81adf1`
+- feat(ui): hold a scene card to generate a fresh preview `ef5b86f95`
+
 ## 2026-10-24
 
 - **upstream sync**: merged stashapp/stash `develop` at `bdee3c83` (44 upstream commits) `8cf477772`. What they changed is in upstream's changelog, not here

@@ -1,0 +1,433 @@
+// fork: press and hold a scene card's thumbnail to generate. See
+// HoldToGenerate.tsx.
+//
+// The phases, as classes on .hold-generate:
+//
+//   .hold-charging    the press is being held: the thumbnail sinks and dims,
+//                     a ring fills around a cog that spins faster as it fills
+//   .hold-draining    let go too soon: the ring drains back and it all fades
+//   .hold-generating  the hold landed: a flash and a shockwave leave a
+//                     glowing gear behind, which turns slowly while the
+//                     job is queued (.hold-queued), faster once it runs
+//                     (.hold-running)
+//   .hold-done        the new preview is in: the gear becomes a check in the
+//                     theme's "done" colour
+//   .hold-failed      or a cross in its "failed" one
+//
+// --hold-charge is how long the ring takes to fill.
+//
+// The colours are custom properties so a theme can recolour the whole thing
+// from its own file. These are Blueprint's: its link blue for the charge,
+// its primary for the deep end, its slate for the shade. pb sets its own in
+// styles/themes/_pb.scss.
+
+.hold-generate {
+  --hold-accent: #{$link-color};
+  --hold-accent-deep: #{map-get($theme-colors, "primary")};
+  // what the accent burns up to at the end of the charge: near white, so
+  // the moment stands out by brightness even where the hue is everywhere
+  --hold-hot: #eef8ff;
+  --hold-shade: #{$body-bg};
+  --hold-surface: #{rgba($dark-gray2, 0.85)};
+  --hold-done: #3dcc91;
+  --hold-failed: #{$danger};
+  --hold-text: #{$text-color};
+
+  position: relative;
+  // no callout or text selection on a long press on touch
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+// dragging over the card's title and details mid-hold doesn't select them
+.scene-card:has(.hold-charging) {
+  user-select: none;
+}
+
+.hold-generate-content {
+  transition:
+    transform 0.25s ease-out,
+    filter 0.25s ease-out;
+}
+
+.hold-charging .hold-generate-content {
+  filter: saturate(0.3) brightness(0.55);
+  transform: scale(0.94);
+  transition:
+    transform var(--hold-charge) cubic-bezier(0.3, 0, 0.6, 1),
+    filter var(--hold-charge) ease-in;
+}
+
+.hold-generating .hold-generate-content {
+  animation: hold-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.hold-generate-veil {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+}
+
+.hold-charging .hold-generate-veil {
+  animation: hold-fade-in 0.3s ease-out both;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--hold-shade) 15%, transparent) 0%,
+    color-mix(in srgb, var(--hold-shade) 75%, transparent) 100%
+  );
+}
+
+// ---- charging ----------------------------------------------------------------
+
+.hold-generate-dial {
+  // pops in, then glows more and more as the charge builds
+  animation:
+    hold-dial-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    hold-glow var(--hold-charge) ease-in forwards;
+  aspect-ratio: 1;
+  position: relative;
+  width: min(34%, 96px);
+
+  // a bloom of the accent behind the ring, swelling with the charge
+  &::before {
+    animation: hold-bloom var(--hold-charge) cubic-bezier(0.5, 0, 1, 1)
+      forwards;
+    background: radial-gradient(
+      circle,
+      var(--hold-accent) 0%,
+      color-mix(in srgb, var(--hold-accent-deep) 50%, transparent) 40%,
+      transparent 70%
+    );
+    border-radius: 50%;
+    content: "";
+    inset: -60%;
+    opacity: 0;
+    position: absolute;
+    z-index: -1;
+  }
+
+  svg {
+    // the ring starts at twelve o'clock
+    transform: rotate(-90deg);
+    width: 100%;
+  }
+
+  circle {
+    fill: none;
+    stroke-width: 7;
+  }
+
+  .hold-track {
+    stroke: color-mix(in srgb, var(--hold-text) 18%, transparent);
+  }
+
+  .hold-charge {
+    // the ring heats from the accent to white as it closes
+    animation:
+      hold-fill var(--hold-charge) cubic-bezier(0.4, 0, 0.8, 1) forwards,
+      hold-heat var(--hold-charge) cubic-bezier(0.6, 0, 1, 1) forwards;
+    stroke: var(--hold-accent);
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    stroke-linecap: round;
+  }
+
+  .hold-cog {
+    animation:
+      hold-spin-up var(--hold-charge) cubic-bezier(0.5, 0, 1, 1) forwards,
+      hold-heat-text var(--hold-charge) cubic-bezier(0.6, 0, 1, 1) forwards;
+    color: var(--hold-text);
+    font-size: 1.6em;
+    left: 50%;
+
+    // the Icon component sets its own margin
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+}
+
+// ---- given up on ------------------------------------------------------------
+// The hold was let go with the dial up. Everything is frozen where it had got
+// to (HoldToGenerate reads it off the running animations into --hold-drain-*),
+// then the ring drains back to empty while the dial and the shade fade, and
+// the thumbnail eases back up on its own transition.
+
+.hold-draining .hold-generate-veil {
+  animation: hold-fade-out var(--hold-drain) ease-in forwards;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--hold-shade) 15%, transparent) 0%,
+    color-mix(in srgb, var(--hold-shade) 75%, transparent) 100%
+  );
+}
+
+.hold-draining .hold-generate-dial {
+  animation: none;
+
+  .hold-charge {
+    animation: hold-drain var(--hold-drain) cubic-bezier(0.3, 0, 0.2, 1)
+      forwards;
+    stroke: var(--hold-drain-stroke);
+  }
+
+  .hold-cog {
+    animation: none;
+    color: var(--hold-drain-cog-color);
+    transform: var(--hold-drain-cog);
+  }
+}
+
+@keyframes hold-drain {
+  from {
+    stroke-dashoffset: var(--hold-drain-from);
+  }
+
+  to {
+    stroke-dashoffset: 100;
+  }
+}
+
+// ---- landed ------------------------------------------------------------------
+
+.hold-generate-flash {
+  animation: hold-flash 0.5s ease-out forwards;
+  background: radial-gradient(
+    circle,
+    var(--hold-hot) 0%,
+    color-mix(in srgb, var(--hold-accent) 60%, transparent) 35%,
+    transparent 75%
+  );
+  inset: 0;
+  position: absolute;
+}
+
+.hold-generate-shockwave {
+  animation: hold-shockwave 0.7s cubic-bezier(0.1, 0.6, 0.3, 1) forwards;
+  aspect-ratio: 1;
+  border: 3px solid var(--hold-hot);
+  border-radius: 50%;
+  box-shadow:
+    0 0 16px var(--hold-accent),
+    inset 0 0 16px var(--hold-accent);
+  position: absolute;
+  width: min(34%, 96px);
+}
+
+// The gear the blast leaves behind. It glows and turns for as long as the
+// job is going - slowly while it's queued, faster once it runs - then gives
+// way to a check (or a cross) that pops in and fades.
+.hold-generate-emblem {
+  animation: hold-emblem-in 0.5s 0.12s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  color: var(--hold-hot);
+  filter: drop-shadow(0 0 3px var(--hold-hot))
+    drop-shadow(0 0 10px var(--hold-accent))
+    drop-shadow(0 0 22px var(--hold-accent-deep));
+  font-size: 2rem;
+  position: relative;
+
+  .fa-icon {
+    margin: 0;
+  }
+}
+
+.hold-generating .hold-generate-emblem {
+  // turning, and breathing with it
+  .fa-icon {
+    animation: hold-spin 4s linear infinite;
+  }
+
+  &::after {
+    animation: hold-breathe 2s ease-in-out infinite;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--hold-accent) 45%, transparent),
+      transparent 70%
+    );
+    border-radius: 50%;
+    content: "";
+    inset: -80%;
+    position: absolute;
+    z-index: -1;
+  }
+}
+
+.hold-queued .hold-generate-emblem {
+  opacity: 0.6;
+}
+
+.hold-running .hold-generate-emblem .fa-icon {
+  animation-duration: 1.6s;
+}
+
+.hold-done .hold-generate-emblem {
+  color: var(--hold-done);
+  filter: drop-shadow(0 0 4px var(--hold-done))
+    drop-shadow(0 0 14px var(--hold-done));
+}
+
+.hold-failed .hold-generate-emblem {
+  color: var(--hold-failed);
+  filter: drop-shadow(0 0 6px var(--hold-failed));
+}
+
+.hold-done,
+.hold-failed {
+  .hold-generate-emblem {
+    animation:
+      hold-emblem-in 0.4s cubic-bezier(0.2, 1.6, 0.4, 1) both,
+      hold-fade-out 0.4s 1.3s ease-in forwards;
+  }
+}
+
+// a finished hold has no flash or shockwave to replay
+.hold-done,
+.hold-failed {
+  .hold-generate-flash,
+  .hold-generate-shockwave {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-charging .hold-generate-content,
+  .hold-generating .hold-generate-content {
+    animation: none;
+    transform: none;
+  }
+
+  .hold-generate-dial .hold-cog,
+  .hold-generate-shockwave,
+  .hold-generate-emblem::after,
+  .hold-generate-emblem .fa-icon {
+    animation: none;
+  }
+}
+
+@keyframes hold-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hold-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes hold-dial-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes hold-fill {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes hold-glow {
+  from {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+
+  60% {
+    filter: drop-shadow(0 0 6px var(--hold-accent))
+      drop-shadow(0 0 14px var(--hold-accent-deep));
+  }
+
+  to {
+    filter: drop-shadow(0 0 4px var(--hold-hot))
+      drop-shadow(0 0 16px var(--hold-accent))
+      drop-shadow(0 0 36px var(--hold-accent-deep));
+  }
+}
+@keyframes hold-heat {
+  to {
+    stroke: var(--hold-hot);
+  }
+}
+@keyframes hold-heat-text {
+  to {
+    color: var(--hold-hot);
+  }
+}
+@keyframes hold-bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+
+  to {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+}
+
+// slow at first, faster and faster as the ring fills
+@keyframes hold-spin-up {
+  to {
+    transform: translate(-50%, -50%) rotate(1080deg);
+  }
+}
+@keyframes hold-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hold-pop {
+  0% {
+    transform: scale(0.94);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes hold-flash {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+@keyframes hold-shockwave {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(4);
+  }
+}
+@keyframes hold-emblem-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2) rotate(-90deg);
+  }
+}
+@keyframes hold-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
