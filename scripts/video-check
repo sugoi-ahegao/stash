@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""Decode every video with ffmpeg and report the ones that are corrupted.
+
+ffmpeg decodes each file to nowhere (`-f null -`): every packet is read, every frame
+of the first video stream and of every audio stream is decompressed, and nothing is
+written. Damage that playback would trip over shows up as decoder errors on stderr,
+as an ffmpeg failure, or as a decode that stops well short of the file's duration.
+
+The file list comes from a stash database (read-only; by default this checkout's dev
+copy in .local/, whose paths are WSL paths) or from files/folders given as arguments.
+Results are appended to a JSONL file as they finish, so an interrupted run picks up
+where it stopped.
+
+Usage:
+  scripts/video-check                    decode every video in the library
+  scripts/video-check --quick            keyframes only: much less CPU, still reads every byte
+  scripts/video-check PATH...            only these files / folders
+  scripts/video-check --report           print the report from earlier results
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import zip_longest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DB = ROOT / ".local" / "stash-go.sqlite"
+DEFAULT_RESULTS = ROOT / ".local" / "video-check.jsonl"
+VIDEO_EXTS = {".mp4", ".m4v", ".mkv", ".avi", ".wmv", ".mov", ".webm", ".flv", ".mpg", ".mpeg", ".ts", ".m2ts", ".3gp", ".gif"}
+
+# a decode that ends this far short of the expected duration counts as truncated
+SHORT_TOLERANCE = 0.98
+# stderr lines kept per file; the count covers all of them
+KEEP_LINES = 15
+
+
+def videos_from_db(db):
+    import sqlite3
+
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    rows = con.execute(
+        """
+        SELECT fo.path || '/' || f.basename, f.size, v.duration, sf.scene_id
+        FROM files f
+        JOIN video_files v ON v.file_id = f.id
+        JOIN folders fo ON fo.id = f.parent_folder_id
+        LEFT JOIN scenes_files sf ON sf.file_id = f.id
+        ORDER BY 1
+        """
+    ).fetchall()
+    con.close()
+    return [{"path": p, "size": s, "duration": d, "scene_id": sid} for p, s, d, sid in rows]
+
+
+def videos_from_paths(paths):
+    out = []
+    for p in map(Path, paths):
+        files = [p] if p.is_file() else sorted(x for x in p.rglob("*") if x.suffix.lower() in VIDEO_EXTS)
+        for f in files:
+            out.append({"path": str(f), "size": f.stat().st_size, "duration": None, "scene_id": None})
+    return out
+
+
+def interleave_by_drive(videos):
+    """Alternate between drives so parallel jobs don't all seek on one disk."""
+    groups = {}
+    for v in videos:
+        groups.setdefault(Path(v["path"]).parts[:3], []).append(v)
+    return [v for batch in zip_longest(*groups.values()) for v in batch if v]
+
+
+def probe_duration(path):
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+        capture_output=True, text=True,
+    )
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        return None
+
+
+def check(video, quick, timeout):
+    path = video["path"]
+    result = {**video, "quick": quick, "status": "ok", "errors": 0, "lines": []}
+    if not os.path.exists(path):
+        result["status"] = "missing"
+        return result
+    expected = video["duration"] or probe_duration(path)
+    cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-nostats", "-v", "error", "-progress", "pipe:1"]
+    if quick:
+        cmd += ["-skip_frame", "nokey"]
+    cmd += ["-i", path, "-map", "0:v:0?", "-map", "0:a?", "-f", "null", "-"]
+
+    start = time.monotonic()
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout)
+    except subprocess.TimeoutExpired:
+        result.update(status="timeout", seconds=round(time.monotonic() - start, 1))
+        return result
+    result["seconds"] = round(time.monotonic() - start, 1)
+
+    lines = [l for l in r.stderr.splitlines() if l.strip()]
+    result["errors"] = len(lines)
+    result["lines"] = lines[:KEEP_LINES]
+
+    decoded = None
+    for line in r.stdout.splitlines():
+        if line.startswith("out_time_us=") and line[12:].lstrip("-").isdigit():
+            decoded = int(line[12:]) / 1e6
+    result["decoded"] = decoded
+    result["expected"] = expected
+
+    if r.returncode != 0:
+        result["status"] = "failed"
+    elif expected and (decoded is None or decoded < expected * SHORT_TOLERANCE):
+        result["status"] = "truncated"
+    elif lines:
+        result["status"] = "errors"
+    return result
+
+
+def load_results(path):
+    done = {}
+    if path.exists():
+        for line in path.read_text().splitlines():
+            if line.strip():
+                r = json.loads(line)
+                done[r["path"]] = r  # later lines win, so a re-check replaces the old result
+    return done
+
+
+SEVERITY = {"failed": 0, "truncated": 1, "timeout": 2, "errors": 3, "missing": 4}
+
+
+def report(results, verbose):
+    bad = sorted(
+        (r for r in results.values() if r["status"] != "ok"),
+        key=lambda r: (SEVERITY[r["status"]], -r["errors"]),
+    )
+    counts = {}
+    for r in results.values():
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    print(f"\n{len(results)} checked: " + ", ".join(f"{n} {s}" for s, n in sorted(counts.items())))
+    for r in bad:
+        scene = f"scene {r['scene_id']}" if r.get("scene_id") else "no scene"
+        extra = ""
+        if r["status"] == "truncated":
+            extra = f" decoded {r['decoded'] or 0:.0f}s of {r['expected']:.0f}s"
+        print(f"\n[{r['status']}] {r['errors']} error lines, {scene}{extra}\n  {r['path']}")
+        for line in r["lines"][: None if verbose else 3]:
+            print(f"    {line}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("paths", nargs="*", help="files or folders to check instead of the library")
+    ap.add_argument("--db", type=Path, default=DEFAULT_DB, help=f"stash database (default {DEFAULT_DB})")
+    ap.add_argument("--results", type=Path, default=DEFAULT_RESULTS, help=f"JSONL results (default {DEFAULT_RESULTS})")
+    ap.add_argument("-j", "--jobs", type=int, default=4, help="files decoded at once (default 4)")
+    ap.add_argument("--quick", action="store_true", help="decode keyframes only")
+    ap.add_argument("--timeout", type=int, default=3 * 3600, help="seconds per file (default 3h)")
+    ap.add_argument("--recheck", action="store_true", help="check files that already have a result")
+    ap.add_argument("--report", action="store_true", help="only print the report from earlier results")
+    ap.add_argument("-v", "--verbose", action="store_true", help="show more ffmpeg lines per file")
+    args = ap.parse_args()
+
+    done = load_results(args.results)
+    if args.report:
+        report(done, args.verbose)
+        return
+
+    videos = videos_from_paths(args.paths) if args.paths else videos_from_db(args.db)
+    if not args.recheck:
+        videos = [v for v in videos if v["path"] not in done]
+    videos = interleave_by_drive(videos)
+    total_bytes = sum(v["size"] for v in videos)
+    print(f"{len(videos)} videos to check ({total_bytes / 1e12:.2f} TB), {args.jobs} at a time"
+          f"{', keyframes only' if args.quick else ''}. Results: {args.results}", flush=True)
+
+    args.results.parent.mkdir(parents=True, exist_ok=True)
+    lock = threading.Lock()
+    checked_bytes = 0
+    started = time.monotonic()
+    try:
+        with ThreadPoolExecutor(args.jobs) as pool, args.results.open("a") as out:
+            futures = [pool.submit(check, v, args.quick, args.timeout) for v in videos]
+            for i, fut in enumerate(as_completed(futures), 1):
+                r = fut.result()
+                with lock:
+                    out.write(json.dumps(r) + "\n")
+                    out.flush()
+                done[r["path"]] = r
+                checked_bytes += r["size"]
+                rate = checked_bytes / max(time.monotonic() - started, 1)
+                eta = (total_bytes - checked_bytes) / rate / 3600 if rate else 0
+                mark = "  " if r["status"] == "ok" else "!!"
+                print(f"{mark} [{i}/{len(videos)}] {r['status']:9} {r.get('seconds', 0):6.0f}s "
+                      f"{rate / 1e6:5.0f} MB/s  eta {eta:4.1f}h  {Path(r['path']).name}", flush=True)
+    except KeyboardInterrupt:
+        print("\nInterrupted; finished files are saved, run again to resume.", file=sys.stderr)
+        os._exit(130)  # don't wait on the ffmpeg processes still running
+
+    report(done, args.verbose)
+
+
+if __name__ == "__main__":
+    main()
