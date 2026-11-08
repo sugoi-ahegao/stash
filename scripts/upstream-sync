@@ -53,7 +53,9 @@ ensure_remote() {
 	git -C "$MAIN_CHECKOUT" remote get-url upstream >/dev/null 2>&1 ||
 		git -C "$MAIN_CHECKOUT" remote add upstream "$UPSTREAM_URL"
 	info "Fetching upstream"
-	git -C "$MAIN_CHECKOUT" fetch --quiet upstream develop
+	# release tags too: `git describe` names the upstream release a build includes. Only v*:
+	# upstream moves latest_develop, and fetching it would be refused as a clobber.
+	git -C "$MAIN_CHECKOUT" fetch --quiet upstream develop '+refs/tags/v*:refs/tags/v*'
 }
 
 merging() { git rev-parse -q --verify MERGE_HEAD >/dev/null; }

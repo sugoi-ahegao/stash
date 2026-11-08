@@ -44,7 +44,6 @@ const sortByOptions = [
   "date",
   "production_date",
   "file_count",
-  "filesize",
   "duration",
   "framerate",
   "resolution",
@@ -64,6 +63,10 @@ const sortByOptions = [
 ]
   .map(ListFilterOptions.createSortBy)
   .concat([
+    {
+      messageID: "files_size",
+      value: "filesize",
+    },
     {
       messageID: "o_count",
       value: "o_counter",

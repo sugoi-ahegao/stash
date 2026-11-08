@@ -45,10 +45,9 @@ const ViewOnHoverContext = React.createContext<ViewOnHoverPage | undefined>(
   undefined
 );
 
-export const ViewOnHover: React.FC<{ page: ViewOnHoverPage }> = ({
-  page,
-  children,
-}) => (
+export const ViewOnHover: React.FC<
+  React.PropsWithChildren<{ page: ViewOnHoverPage }>
+> = ({ page, children }) => (
   <ViewOnHoverContext.Provider value={page}>
     {children}
   </ViewOnHoverContext.Provider>

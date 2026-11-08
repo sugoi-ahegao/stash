@@ -321,10 +321,11 @@ func (r *queryResolver) Latestversion(ctx context.Context) (*LatestVersion, erro
 	logger.Infof("Retrieved latest version: %s (%s)", latestRelease.Version, latestRelease.ShortHash)
 
 	return &LatestVersion{
-		Version:     latestRelease.Version,
-		Shorthash:   latestRelease.ShortHash,
-		ReleaseDate: latestRelease.Date,
-		URL:         latestRelease.Url,
+		Version:         latestRelease.Version,
+		Shorthash:       latestRelease.ShortHash,
+		ReleaseDate:     latestRelease.Date,
+		URL:             latestRelease.Url,
+		UpdateAvailable: forkUpdateAvailable(latestRelease.Version), // fork
 	}, nil
 }
 

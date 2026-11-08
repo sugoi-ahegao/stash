@@ -215,11 +215,9 @@ interface IHoldToGenerate {
 
 // Wraps a scene card's thumbnail. It sits inside the card's link, so it sees
 // the press first and can swallow the click that ends a completed hold.
-export const HoldToGenerate: React.FC<IHoldToGenerate> = ({
-  scene,
-  disabled,
-  children,
-}) => {
+export const HoldToGenerate: React.FC<
+  React.PropsWithChildren<IHoldToGenerate>
+> = ({ scene, disabled, children }) => {
   const { configuration } = useConfigurationContext();
   const Toast = useToast();
 

@@ -200,7 +200,7 @@ func GetLatestRelease(ctx context.Context) (*LatestRelease, error) {
 	wantedRelease := getWantedRelease(platform)
 
 	url := apiReleasesURL()
-	if build.IsDevelop() {
+	if build.IsDevelop() && !forkFollowsReleases { // fork
 		// get the release tagged with the development tag
 		url += "/tags/" + developmentTag
 	} else {
@@ -303,6 +303,10 @@ func printLatestVersion(ctx context.Context) {
 	if err != nil {
 		logger.Errorf("Couldn't retrieve latest version: %v", err)
 	} else {
+		if forkLogIfUpToDate(latestRelease) { // fork
+			return
+		}
+
 		_, githash, _ := build.Version()
 		switch githash {
 		case "":

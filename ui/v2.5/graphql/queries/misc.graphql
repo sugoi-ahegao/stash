@@ -44,5 +44,6 @@ query LatestVersion {
     shorthash
     release_date
     url
+    update_available
   }
 }

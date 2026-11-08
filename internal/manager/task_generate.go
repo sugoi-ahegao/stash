@@ -452,6 +452,7 @@ func (j *GenerateJob) queueSceneJobs(ctx context.Context, g *generate.Generator,
 	if j.input.Previews {
 		task := &GeneratePreviewTask{
 			Scene:               *scene,
+			VideoPreview:        true, // fork: upstream #6685 added this field but not here, so Generate made no previews
 			ImagePreview:        j.input.ImagePreviews,
 			Options:             options,
 			Overwrite:           j.overwrite,

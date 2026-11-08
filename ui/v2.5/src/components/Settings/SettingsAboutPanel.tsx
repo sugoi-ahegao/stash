@@ -41,7 +41,8 @@ export const SettingsAboutPanel: React.FC = () => {
     } else {
       let heading = dataLatest.latestversion.version;
       const hashString = dataLatest.latestversion.shorthash;
-      if (gitHash !== hashString) {
+      // fork: a fork build's hash never matches a release's
+      if (dataLatest.latestversion.update_available) {
         heading +=
           " " +
           intl.formatMessage({
@@ -64,11 +65,7 @@ export const SettingsAboutPanel: React.FC = () => {
               <div className="value">{hashString}</div>
             </div>
             <div>
-              <a href={dataLatest.latestversion.url}>
-                <Button>
-                  {intl.formatMessage({ id: "actions.download" })}
-                </Button>
-              </a>
+              {/* fork: Download removed, it would replace the fork with stock stash */}
               <Button onClick={() => refetch()}>
                 {intl.formatMessage({
                   id: "config.about.check_for_new_version",

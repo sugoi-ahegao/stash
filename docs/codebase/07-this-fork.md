@@ -786,6 +786,17 @@ it doesn't cover the badge.
 
 ---
 
+### New-version notice
+
+A fork build's commit hash never matches a release's, so upstream's check would always say
+"new version". Fork builds instead compare release numbers (`internal/api/fork_version.go`):
+`git describe` puts the last upstream release the build includes at the front of its version
+(`v0.32.0-8-g…`), and that's compared with GitHub's latest full release. The answer is
+`LatestVersion.update_available`, used by Settings → About, the startup log and the navbar
+badge (`UpdateBadge.tsx`, which remembers it for 6 hours per build to spare GitHub's
+anonymous rate limit). `scripts/upstream-sync` fetches the `v*` tags that makes possible.
+About has no Download button: it would replace the fork with stock stash.
+
 ## Feature 5 — Collections (removed)
 
 There was a Collections display mode for the scene list: one row of scene cards per intake

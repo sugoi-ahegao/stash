@@ -9,4 +9,6 @@ type LatestVersion {
   shorthash: String!
   release_date: String!
   url: String!
+  # fork: a newer stash release than the one this build includes
+  update_available: Boolean!
 }

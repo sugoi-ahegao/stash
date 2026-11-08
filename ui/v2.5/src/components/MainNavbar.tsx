@@ -22,6 +22,7 @@ import { Icon } from "src/components/Shared/Icon";
 import { useConfigurationContext } from "src/hooks/Config";
 import { ManualStateContext } from "./Help/context";
 import { SettingsButton } from "./SettingsButton";
+import { UpdateBadge } from "./UpdateBadge"; // fork
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import {
   faBars,
@@ -338,6 +339,7 @@ export const MainNavbar: React.FC = () => {
             <Icon icon={faChartColumn} />
           </Button>
         </NavLink>
+        <UpdateBadge /> {/* fork */}
         <NavLink
           className="nav-utility"
           exact
