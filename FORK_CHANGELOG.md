@@ -6,7 +6,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - Upstream's own changes are in its release notes,
   [`ui/v2.5/src/docs/en/Changelog/`](ui/v2.5/src/docs/en/Changelog/), which the app shows.
   Never add fork entries there.
-- Last upstream commit merged: `v0.31.1-176-gbdee3c83d` (2026-10-07).
+- Last upstream commit merged: `v0.32.0-8-gaefc9373f` (2026-11-07).
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
