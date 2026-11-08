@@ -16,7 +16,8 @@ import { useStopWheelScroll } from "src/utils/form";
 import { Placement } from "react-bootstrap/esm/Overlay";
 import { PatchComponent } from "src/patch";
 
-const PageCount: React.FC<{
+// fork: exported for List/SteadyPagination.tsx
+export const PageCount: React.FC<{
   totalPages: number;
   currentPage: number;
   onChangePage: (page: number) => void;

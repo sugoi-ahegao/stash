@@ -69,3 +69,6 @@ dist
 __pycache__/
 *.py[cod]
 .venv/
+
+# Playwright MCP output
+.playwright-mcp/

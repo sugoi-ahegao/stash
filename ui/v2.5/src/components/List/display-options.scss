@@ -1,0 +1,163 @@
+// fork: the display options button and its popover (List/DisplayOptions.tsx).
+
+// Even padding both sides: the icons drop the global .fa-icon side margins and
+// are spaced by the gap.
+.display-options-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  white-space: nowrap;
+
+  > .fa-icon {
+    margin: 0;
+  }
+
+  > .fa-icon:last-child {
+    font-size: 0.65rem;
+    opacity: 0.6;
+  }
+}
+
+.popover.display-options {
+  max-width: none;
+  min-width: 19rem;
+
+  .popover-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.25rem 1.35rem;
+  }
+
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  h6 {
+    color: $text-muted;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+}
+
+// The modes, and thumbnails shown / hidden, as segmented controls: icon over
+// label, the current one filled.
+.display-options-segmented {
+  background-color: rgb(0 0 0 / 20%);
+  border-radius: 0.4rem;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+
+  button {
+    align-items: center;
+    background: none;
+    border: 0;
+    border-radius: 0.3rem;
+    color: inherit;
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    font-size: 0.75rem;
+    gap: 0.45rem;
+    opacity: 0.65;
+    padding: 0.75rem 0.9rem;
+    transition:
+      background-color 0.12s,
+      opacity 0.12s;
+
+    svg {
+      font-size: 1.1rem;
+    }
+
+    &:hover {
+      background-color: rgb(255 255 255 / 6%);
+      opacity: 1;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $primary;
+      outline-offset: -2px;
+    }
+
+    &.active {
+      background-color: $secondary;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+      opacity: 1;
+    }
+  }
+}
+
+// Small cards ← slider → big cards, the slider taking the width.
+.display-options-zoom {
+  align-items: center;
+  display: flex;
+  gap: 0.9rem;
+  padding: 0.2rem 0.15rem;
+
+  .zoom-small {
+    font-size: 0.7rem;
+    opacity: 0.6;
+  }
+
+  .zoom-large {
+    font-size: 1rem;
+    opacity: 0.6;
+  }
+
+  input[type="range"].zoom-slider {
+    flex: 1;
+    height: 1.2rem;
+    max-width: none;
+  }
+}
+
+// Thumbnails Show / Hide: shaped like the mode buttons, a little shorter.
+.display-options-segmented.compact button {
+  gap: 0.35rem;
+  padding: 0.55rem 0.9rem;
+
+  svg {
+    font-size: 0.95rem;
+  }
+}
+
+// Per page: the presets and Custom as a 4 × 2 grid, as tall as the thumbnail
+// buttons, so they're as easy to hit as the rest of the popover.
+.display-options-segmented.page-sizes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+
+  button,
+  .page-size-custom-input {
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    min-height: 2.5rem;
+    padding: 0.55rem 0.3rem;
+  }
+
+  .page-size-custom {
+    font-size: 0.8rem;
+  }
+
+  .page-size-custom-input {
+    background-color: rgb(0 0 0 / 30%);
+    border: 1px solid $primary;
+    border-radius: 0.3rem;
+    color: inherit;
+    min-width: 0;
+    text-align: center;
+    width: 100%;
+
+    &:focus {
+      outline: none;
+    }
+  }
+}

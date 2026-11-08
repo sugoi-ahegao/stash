@@ -10,6 +10,33 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-08
+
+- feat(ui): bigger centred toolbar search, pill buttons and roomier scene list header `c7e742f5d`
+- feat(ui): scene list's bottom pager always there, pinned to the window `bfe3ebc4a`
+- feat(ui): scene list's first studio images load before their cards rise `bdfda38a6`
+- feat(ui): scene list's first thumbnails load before their cards rise `2c8baa2cf`
+- feat(ui): scene list says "No results", or "No scenes yet" for an empty library `3853b1aff`
+- feat(ui): scene list's top pager always there, so the cards don't jump `e191c2a9f`
+- feat(ui): scenes grid zoom as cards per row, with a centred last row `8d05afa37`
+- feat(ui): scene results fade out, and the new ones rise into their slots `345631657`
+- fix(ui): toolbar and filter chip fixes from review `5869e2ec8`
+- fix(ui): bulk edit mode toggle reads clearly in the pb theme `9f11b6cb3`
+- tune(ui): old scene cards sink as they fade out `8d0ba8628`
+- tune(ui): scene cards grow into place as they rise `7dfa0ef52`
+- tune(ui): scene cards rise in one diagonal wave and land with a small bounce `ea5bfbf9e`
+- chore(git): ignore .playwright-mcp output folder `62e0c5974`
+
+## 2026-11-07
+
+- feat(ui): a big search bar at the toolbar's centre, and a toolbar that holds still `ce278a73a`
+- feat(ui): scene results count at the toolbar's right end; even saved filter button `0a066cefb`
+- feat(ui): every old sidebar section is a quick scene filter `2c5643449`
+- feat(ui): scene filter as a row of chips; saved filters named and first `2001b7945`
+- feat(ui): per page in the display options popover `44a01ed36`
+- feat(ui): one display options button for view mode, card size and thumbnails `0d26ab7df`
+- tune(ui): per page as a 4 × 2 grid of full-size buttons `00aeb2b11`
+
 ## 2026-11-02
 
 - feat(ui): hold a scene card to generate a fresh preview `124ba8d51`

@@ -64,19 +64,21 @@ All lazy-loaded. `useTitleProps` + `<Helmet>` set the document title at this lev
   │        ├── listSelect                selection state                     │
   │        └── modalState                edit/delete/export dialogs          │
   │                                                                          │
-  │   ┌── Sidebar ────────────┐  ┌── main pane ──────────────────────────┐   │
-  │   │ FilteredSidebarHeader │  │ FilteredListToolbar                   │   │
-  │   │ SidebarPerformersFilter│ │   ├ search box                        │   │
-  │   │ SidebarStudiosFilter   │ │   ├ ListOperationButtons (edit/delete/│   │
-  │   │ SidebarTagsFilter      │ │   │   export/generate/identify/merge) │   │
-  │   │ SidebarRatingFilter    │ │   ├ SortBySelect                      │   │
-  │   │ SidebarDurationFilter  │ │   └ ListViewOptions (display mode,    │   │
-  │   │ SidebarBooleanFilter   │ │        zoom, [thumbnail toggle*])     │   │
-  │   │ …                      │ │ FilterTags   (active criteria pills)  │   │
-  │   └───────────────────────┘  │ Pagination / PaginationIndex          │   │
-  │                              │ PagedList → LoadedContent             │   │
-  │                              │    └─ one of the DISPLAY MODES below  │   │
-  │                              └───────────────────────────────────────┘   │
+  │   ┌── main pane (no sidebar on the scene list*) ──────────────────────┐   │
+  │   │ FilteredListToolbar                                               │   │
+  │   │   ├ saved filters* (named when active), search bar*,              │   │
+  │   │   │   filter button (not on scenes*)                              │   │
+  │   │   ├ SortBySelect                                                  │   │
+  │   │   ├ ListOperationButtons (edit/delete/export/generate/identify/…) │   │
+  │   │   ├ DisplayOptions* (mode, zoom, thumbnails, page size)           │   │
+  │   │   └ (beside it) results count* (scenes, md up; else under pager)  │   │
+  │   │ FilterChips*   + Filter, Clear, a chip per filter in use: quick   │   │
+  │   │                ones a Sidebar*Filter in a popover, the rest       │   │
+  │   │                → EditFilterDialog                                 │   │
+  │   │ Pagination / PaginationIndex                                      │   │
+  │   │ PagedList → LoadedContent                                         │   │
+  │   │    └─ one of the DISPLAY MODES below                              │   │
+  │   └───────────────────────────────────────────────────────────────────┘   │
   └──────────────────────────────────────────────────────────────────────────┘
                                                         * added by this fork
 ```
@@ -84,7 +86,8 @@ All lazy-loaded. `useTitleProps` + `<Helmet>` set the document title at this lev
 **Display modes** (`DisplayMode` in `models/list-filter/types.ts:14`):
 
 ```
-   Grid    → SceneCardGrid   → SceneCard × N        the default
+   Grid    → SceneGrid       → SceneCard × N        the default (fork: zoom as cards per
+                                                    row, in place of SceneCardGrid, doc 07)
    List    → SceneListTable  → ListTable + IColumn[]  (column picker via useTableColumns)
    Wall    → SceneWallPanel  → WallPanel/WallItem     dense hover-preview mosaic
    Tagger  → Tagger          → the stash-box workflow (scenes/performers only)
@@ -154,7 +157,8 @@ Shared detail-page furniture lives in `Shared/DetailsPage/`: `DetailTitle`, `Hea
 
 Cards are width-driven, not breakpoint-driven: the grid measures its container with a
 `ResizeObserver` (debounced) and computes a card width from the zoom level. That's why zoom
-works smoothly and why cards reflow correctly inside the sidebar layout.
+works smoothly and why cards reflow correctly inside the sidebar layout (the lists that
+still have one).
 
 ⚠️ `GridCard`, every `*Card` and every `*CardGrid` are registered with `PatchComponent`.
 Their names are a public API for plugins (doc 05).
@@ -410,7 +414,7 @@ Following one click through the system:
    Apollo → POST /graphql → backend filter engine (doc 03)
         │
         ▼
-   items → SceneCardGrid → SceneCard × N
+   items → SceneGrid → SceneCard × N
         │
         ▼
    User clicks a card → SceneQueue.fromListFilterModel(filter)
@@ -436,6 +440,7 @@ rather than hand-building URLs** — it keeps the encoding in sync with `ListFil
   A new settings option (backend-backed)  → Settings panel + a GraphQL config field
   A new settings option (UI-only)         → IUIConfig + saveUI — no backend change
   A new sidebar filter                    → List/Filters/Sidebar*.tsx + wire into the list
+                                            (on scenes: a chip in Scenes/SceneFilterChips.tsx)
 ```
 
 ⚠️ Before adding a component, check `Shared/` for an existing one. The most common review

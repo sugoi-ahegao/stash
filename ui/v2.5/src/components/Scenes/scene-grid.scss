@@ -1,0 +1,43 @@
+// fork: the scene list's grid view (Scenes/SceneGrid.tsx). --scene-cards
+// cards per row (from the zoom level), each that share of the row's width,
+// at most 4 on a tablet and 2 on a phone. A wrapping row rather than grid
+// columns, so a short last row sits in the middle. The gap stands in for the
+// cards' 5px margins.
+
+$scene-grid-gap: 10px;
+
+.scene-grid {
+  --scene-grid-cards: var(--scene-cards);
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: $scene-grid-gap;
+  justify-content: center;
+  margin: 5px;
+
+  > .scene-card {
+    flex: 0 0
+      calc(
+        (100% - (var(--scene-grid-cards) - 1) * #{$scene-grid-gap}) /
+          var(--scene-grid-cards)
+      );
+    margin: 0;
+    min-width: 0;
+  }
+}
+
+// a tablet
+@include media-breakpoint-down(md) {
+  .scene-grid {
+    --scene-grid-cards: min(var(--scene-cards), 4);
+  }
+}
+
+// a phone
+@include media-breakpoint-down(xs) {
+  .scene-grid {
+    --scene-grid-cards: min(var(--scene-cards), 2);
+
+    margin: 5px 0;
+  }
+}

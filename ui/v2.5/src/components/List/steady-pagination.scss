@@ -1,0 +1,29 @@
+// fork: the always-there pager (List/SteadyPagination.tsx). The fieldset only
+// disables the count's buttons; it takes no room of its own.
+
+.steady-pagination-count {
+  border: 0;
+  display: contents;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+// The bottom pager, pinned to the window, so it's in the same place however
+// many results there are. The space keeps the last cards clear of it, and is
+// always the same height, so the page doesn't move.
+.steady-pagination-footer-space {
+  height: 4rem;
+}
+
+.steady-pagination-footer {
+  left: 0;
+  position: fixed;
+  right: 0;
+}
+
+@include media-breakpoint-up(md) {
+  .sidebar-pane:not(.hide-sidebar) .steady-pagination-footer {
+    left: $sidebar-width;
+  }
+}

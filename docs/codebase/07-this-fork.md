@@ -72,6 +72,27 @@ upstream commits had no server-side conflicts.
        List/FilteredListToolbar.tsx,
        hooks/LocalForage.ts,
        Scenes/SceneList.tsx, Scenes/styles.scss
+  NEW  List/DisplayOptions.tsx,                 one toolbar button for display mode,
+       List/display-options.scss                  card size, thumbnails and page size
+  NEW  List/FilterChips.tsx,                   the scene list's filter as a row of
+       List/filter-chips.scss,                    chips, in place of its sidebar, filter
+       Scenes/SceneFilterChips.tsx                button and filter tags
+  MOD  Scenes/SceneList.tsx,                     call sites: FilterChips, no sidebar;
+       List/FilteredListToolbar.tsx               showFilterButton={false}; saved filters
+                                                  first, naming the active one
+  NEW  List/activeSavedFilter.ts                 which saved filter is shown
+  NEW  List/ToolbarSearch.tsx,                  the toolbar's search bar, in place of
+       List/toolbar-search.scss                   SearchTermInput there
+  NEW  styles/_page-gutter.scss                  the page keeps its scrollbar's room
+  NEW  Scenes/SceneResults.tsx,                 scene results stay while the next load,
+       Scenes/scene-results.scss                  then arrive as a wave
+  NEW  Scenes/SceneGrid.tsx,                    the scenes grid: zoom as cards per row,
+       Scenes/scene-grid.scss                     in place of SceneCardGrid
+  NEW  List/SteadyPagination.tsx,               the scene list's top pager, always there
+       List/steady-pagination.scss                (PageCount exported from Pagination.tsx)
+  NEW  Scenes/NoScenes.tsx,                     "No results" / "No scenes yet" in place
+       Scenes/no-scenes.scss                      of an empty list
+  MOD  List/SavedFilterList.tsx                  toggleLabel / toggleClassName props
   MOD  utils/text.ts, criteria/criterion.ts,     relative date expressions in filters
        List/Filters/TimestampFilter.tsx
   MOD  pkg/scene/generate/preview.go,            previews at native resolution,
@@ -366,7 +387,8 @@ which is what makes it easy to raise the limit temporarily while testing.
 
 ## Feature 2 — Thumbnail visibility toggle
 
-An eye/eye-slash button in the list view options that hides scene grid thumbnails.
+A Thumbnails Show / Hide control in the toolbar's display options popover that hides
+scene grid thumbnails.
 
 ```
   SceneList.tsx        useShowThumbnails(view)  ← List/ThumbnailToggle.tsx; default hidden,
@@ -375,17 +397,193 @@ An eye/eye-slash button in the list view options that hides scene grid thumbnail
         │       └─ Scenes/styles.scss does the actual hiding + hover reveal
         │
         └─ passes showThumbnails / onSetShowThumbnails down through
-              FilteredListToolbar → ListViewOptions → ThumbnailToggle
-                 (rendered only in the Grid display mode)
+              FilteredListToolbar → DisplayOptions (List/DisplayOptions.tsx)
+                 (the control shows only in the Grid display mode)
 ```
+
+`DisplayOptions` is one button, showing the current mode's icon, that opens a popover
+with everything about how the list is shown: the display modes as a segmented control,
+the card-size slider (Grid and Wall), thumbnails Show / Hide as a second segmented
+control (Grid), and Per page: the presets and Custom as a 4 × 2 grid of buttons, Custom
+showing a size that isn't a preset and turning into a field in place when clicked
+(Enter or blur applies, Escape cancels). It replaces upstream's `ListViewButtonGroup`
+(mode buttons, slider, eye) and `PageSizeSelector` at their call sites in
+`FilteredListToolbar`; `ListViewOptions.tsx` is left as upstream has it, and its
+`ThumbnailToggle` eye button is no longer shown. `v g` / `v l` / `v w` / `v t` switch modes
+and `+` / `-` still zoom (`useZoomKeybinds`).
 
 The choice is stored in the interface local forage's `viewConfig`, beside the sidebar's
 open state (`hooks/LocalForage.ts`), so it's per browser and per list: the landing page and
 the Scenes page remember their own.
 
+### Filter chips on the scene list
+
+The scene list (`FilteredSceneList`, so also the scenes tabs of performers, tags, groups
+and studios) has no filter sidebar, no filter button and no filter tags. Under the toolbar
+is one row, `List/FilterChips.tsx`, with a chip only for each filter in use:
+
+```
+  [+ Filter ▾]  Clear  [Tags includes A, B ×]  [Rating ▾]  [<other criterion> ×]
+```
+
+- **+ Filter** lists the quick filters first, from `useSceneFilterChips`
+  (`Scenes/SceneFilterChips.tsx`: the old sidebar's sections, Studio, Performers, Tags,
+  Rating, Duration, Organised, Markers, Duplicated, Performer age and Folder; a studio's
+  scenes have no Studio), then every other criterion option, A–Z. Filters in use aren't
+  listed; their chip edits them.
+- **A quick filter** picked there becomes a chip whose popover opens straight away, holding
+  the same `Sidebar*Filter` the sidebar had, which sets the filter as you pick. The popover
+  gives it a `SidebarStateContext` whose every section reads as open (so each editor needs
+  a `sectionID`), and `filter-chips.scss` hides the section header. Closed with nothing
+  picked, the chip goes.
+- **Any other criterion** opens `EditFilterDialog` on it, picked from the menu or clicked
+  as a chip.
+- A set chip shows `criterion.getLabel()` and an × that removes it. **Clear** removes every
+  criterion (not the search term).
+
+### Saved filters button
+
+On every list's toolbar the saved filters dropdown comes first, before the search box, and
+its button names the saved filter being shown, or reads "Saved filters" dimmed
+(`SavedFilterDropdown`'s fork `toggleLabel`). `useActiveSavedFilter`
+(`List/activeSavedFilter.ts`) finds it: the saved filter that, loaded the way the dropdown
+loads one, gives the same search, sort and criteria. The page, page size, display mode and
+zoom don't count. Change the search, sort or a criterion and it reads "Saved filters"
+again. The bookmark, name and chevron are spaced by a flex gap, with the global
+`.fa-icon` side margins zeroed, so the padding is even. The button is a fixed 12rem
+(9rem on a phone) whatever the name, so the row doesn't shift when it changes; a longer
+name is ellipsised.
+
+### Search bar
+
+Every list's toolbar searches with `ToolbarSearch` (`List/ToolbarSearch.tsx`), not
+upstream's `SearchTermInput`, which the sidebar still uses. It's the row's centrepiece:
+a pill 3.5rem tall, centred between two equal-width sides (`.toolbar-end` holds the buttons after it), up to 60rem wide, with a magnifier, a
+placeholder naming the list ("Search scenes…") and a `/` hint while empty. The row's
+buttons are 3rem pills beside it, a group joined into one with a line between its buttons
+(`toolbar-search.scss`).
+
+- `/` focuses it with the term selected; **Enter** searches at once instead of waiting
+  out the 500ms debounce; **Escape** clears the term, and a second press leaves the field.
+- Focused, its border and icon take the accent, with a ring (pb: red, with a glow).
+- On the scene list the row keeps room for the results count beside it (below). On a
+  phone the bar gets a row of its own, first.
+
+### Play in the ··· menu
+
+The scene list's toolbar has no ▶ button: `SceneList.tsx` doesn't pass `onPlay` to
+`ListOperations`, and its Play operation has no `play-item` class, so it's the first item
+in the ··· menu at every width. Upstream draws ▶ only while the page has items, so it
+went and came back with every search and the row shifted.
+
+### Results count in the toolbar
+
+The scene list renders a second `PaginationIndex` ("1-40 of 2,740 (duration - size)")
+right after `FilteredListToolbar`, in a zero-height `.toolbar-trailing` anchor. From a
+1900px window up it's pinned to the right end of the toolbar row, on one line, and the copy
+under the pager is hidden; narrower, it's the other way round, as upstream has it
+(`filter-chips.scss`).
+
+It stays put when you select: it isn't inside the toolbar, because with a selection the
+toolbar becomes upstream's sticky pill, and anything positioned inside a sticky element is
+placed against it. The toolbar found by `:has(+ .toolbar-trailing)` keeps one height in
+both modes (3.5rem row plus padding), so the count's band doesn't move. The count takes no room in
+the row, which stays centred on the whole toolbar. The count doesn't follow the pill when you scroll.
+
+### Steady page width
+
+`styles/_page-gutter.scss` gives `html` `scrollbar-gutter: stable`: the page always keeps
+the scrollbar's room, so centred content doesn't shift when results stop or start needing
+to scroll. React-bootstrap's modals pad `body` and the fixed navbar by the scrollbar width
+when they hide the scroll (it reads `body.clientWidth < innerWidth`, which the gutter makes
+always true); with the gutter kept, that padding would shift them, so the same file undoes
+it with `!important` over the inline styles.
+
 The plumbing is written generically — `ListViewOptions` and `FilteredListToolbar` take
 optional props and render the button only when both are supplied — so other entity lists
 can opt in by adding the same two props.
+
+### Scene results arriving
+
+`Scenes/SceneResults.tsx` and `scene-results.scss`, called from `SceneList.tsx`. When the
+results change, the scenes on screen fade out and the new ones rise into their slots:
+
+- `useResultsTransition` holds the scenes shown and a phase: **in** (showing), **out**
+  (fading away), **gone** (away, for the moment before the swap). A change is the scenes'
+  ids (in order) changing once the query has loaded; an update to the same scenes (a
+  rating, a view, a selection) shows at once. The first load still shows upstream's
+  spinner.
+- **Loading:** the old scenes stay on screen, dimmed to 0.6 (after 150ms, so a quick load
+  doesn't flicker), so the space is never empty.
+- **Out:** once the new results are here, the old cards sink by 15% of their height and fade out together (200ms). At the
+  same time the first 24 scenes' thumbnails and studio images load (`preloadImages`), and the swap waits for them,
+  for at most 500ms from the results arriving. Those that made it are `img-preloaded`: eager, and
+  rising with their cards without a fade of their own.
+- **In:** the cards get their animation only as the phase moves from gone to in, so a new
+  set plays the entrance without remounting anything. (Keying the wrapper by generation
+  remounted the grid, which lays cards out at a default width until its
+  `useContainerDimensions` has measured it, about 80ms in: the cards snapped to their
+  real size partway through the rise.) The cards rise into their slots in one diagonal
+  wave from the top-left corner: each moves up by its own height, growing from 85% to full size (450ms, going 8px past its slot and dropping back)
+  while `clip-path` uncovers it from the slot's bottom edge, so it comes up through that
+  edge rather than over the cards below.
+- **The order** is measured before the first paint (`stagger`): each card gets `--i`, its
+  place, which is its row plus its column; cards below the fold share the place after the
+  last one on screen. The step is 75ms, shortened so the cards on screen all start within
+  1.5s. Grid and wall cards rise;
+  list rows only fade; the tagger fades in as a whole. The entrance's fill is `backwards`,
+  so nothing stays applied to fight the cards' hover transforms.
+- **Other thumbnails fade in once loaded.** Images in the results are hidden until loaded; one
+  capture-phase `load`/`error` listener on the wrapper marks each `img-ready`, which
+  fades it in to whatever opacity it would have (so `.hide-thumbnails` still hides them).
+- With reduced motion nothing animates.
+
+### Scenes grid: cards per row
+
+`Scenes/SceneGrid.tsx` and `scene-grid.scss`, in place of upstream's `SceneCardGrid` in
+`SceneList.tsx`. Upstream sizes cards in JS: `useContainerDimensions` measures the row
+after the first paint (50ms debounced), and `useCardWidth` fits cards no wider than
+`zoomWidths[zoom]`. Until it has measured, a new grid lays its cards out at that default
+width and then snaps to the real one, which showed as a glitch partway through the
+results' rise (on first load, and on switching views).
+
+Here the zoom level is a number of cards per row, the same on any screen: zoom 0–5 is
+6, 5, 4, 3, 2, 1 per row (`perRow`), capped at 4 on a tablet (below `lg`) and 2 on a phone
+(`xs`). `SceneGrid` sets `--scene-cards`; each card is `flex: 0 0 calc((100% - (n - 1) ×
+10px) / n)` in a wrapping flex row, so the browser sizes them before anything is drawn.
+A wrapping row rather than grid columns, so `justify-content: center` puts a short last
+row in the middle, as upstream's did. The 10px gap stands in for the cards' 5px margins.
+The zoom value, `z=` in the URL and saved filters, and the zoom keys are unchanged; the
+wall view still reads zoom as row height. A plugin patching `SceneCardGrid` no longer
+reaches the scenes list. Only the scenes list; other lists keep upstream's grid.
+
+### Pager always there
+
+`List/SteadyPagination.tsx`, the scene list's top and bottom pagers in place of upstream's
+`Pagination` there. Upstream's renders nothing for one page and a button per page for two
+or three, so the cards below jumped as a search's result count changed. This one is always
+« < N of M > in the compact form (upstream's `PageCount`, exported for it): "1 of 1" with
+everything disabled for one page, "0 of 0" for none. The count comes from the cached
+result, so it holds while a search loads; during the very first load the pager keeps its
+room but is hidden. The bottom pager is pinned to the bottom of the window, with a
+constant-height space under the cards to keep them clear of it, so it stays put however
+many results there are. Scenes only.
+
+### No scenes says so
+
+`Scenes/NoScenes.tsx`, shown inside `SceneResults` in place of the cards once a load comes
+back empty (not in the tagger, which has its own panel, as upstream). "No results"; or,
+on the main scene list (no `filterHook`) with no search term and no filters, an empty
+library: "No scenes yet. Scan a library folder in Settings → Tasks", linking there. The
+strings are `search_filter.no_results`, `no_scenes_yet`, `no_scenes_yet_hint` and
+`settings_tasks` in `en-GB.json`.
+
+### Bulk edit mode toggle
+
+In the pb theme (`styles/themes/_pb.scss`), the Overwrite / Add / Remove toggle in the
+bulk edit dialogs (`.button-group-above`, `Shared/MultiSet.tsx`): the modes not chosen are
+grey, the chosen one solid red with white text. Before, all three were red and the chosen
+one took the bright hover red, the glow and `.btn.active`'s pink text, so it read worst.
 
 ---
 

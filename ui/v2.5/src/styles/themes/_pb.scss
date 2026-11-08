@@ -222,6 +222,31 @@ html[data-theme="pb"] {
     color: $pb-red-light;
   }
 
+  // the bulk edit mode toggle (Overwrite / Add / Remove, Shared/MultiSet.tsx):
+  // the modes not chosen sit back in grey, and the chosen one is solid red
+  // with white text. Before, every mode was red, and the chosen one got the
+  // bright hover red and glow with .btn.active's pink text: hard to read, and
+  // it looked less chosen than the rest.
+  .button-group-above .btn-primary:not(.active) {
+    background-color: #202024;
+    border-color: #2e2e33;
+    box-shadow: none;
+    color: rgba($pb-text, 0.7);
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      background-color: #2a2a30;
+      color: $pb-text;
+    }
+  }
+
+  .button-group-above .btn-primary.active:not(:disabled):not(.disabled) {
+    background-color: $pb-red-dark;
+    border-color: $pb-red-dark;
+    box-shadow: none;
+    color: #fff;
+  }
+
   a.minimal:hover:not(:disabled),
   button.minimal:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.06);
@@ -595,6 +620,79 @@ html[data-theme="pb"] {
     > a:first-child {
     opacity: 0;
     transition-delay: 0s;
+  }
+
+  // filter chips (List/filter-chips.scss): raised like the toolbar's
+  // buttons, a set one glowing red
+  .filter-chip {
+    background-color: $pb-raised;
+    border-color: $pb-line;
+    color: $pb-text;
+
+    &:hover,
+    &.open {
+      background-color: #202024;
+      border-color: #2e2e33;
+    }
+
+    &.set {
+      background-color: rgba(255, 31, 61, 0.14);
+      border-color: rgba(255, 31, 61, 0.55);
+      color: $pb-red-light;
+
+      &:hover,
+      &.open {
+        background-color: rgba(255, 31, 61, 0.22);
+      }
+    }
+  }
+
+  .filter-chip-more .dropdown-toggle.filter-chip {
+    background-color: transparent;
+  }
+
+  .filter-chips-clear.btn-link {
+    color: $pb-muted;
+  }
+
+  .saved-filter-toggle.active > .fa-icon:first-child {
+    color: $pb-red;
+    filter: drop-shadow(0 0 4px rgba(255, 31, 61, 0.6));
+  }
+
+  // the toolbar's search bar (List/toolbar-search.scss): set a shade below the
+  // buttons beside it, and lit red with a glow while focused
+  .toolbar-search {
+    --toolbar-search-accent: #{$pb-red};
+    --toolbar-search-ring: rgba(255, 31, 61, 0.22);
+
+    background-color: $pb-surface;
+    border-color: transparent;
+    color: $pb-text;
+
+    &:hover {
+      background-color: #101012;
+      border-color: $pb-line;
+    }
+
+    &.focused {
+      background-color: #101012;
+      border-color: $pb-line;
+      box-shadow:
+        0 0 0 3px var(--toolbar-search-ring),
+        0 0 22px rgba(255, 31, 61, 0.3),
+        0 12px 32px rgba(0, 0, 0, 0.7);
+    }
+  }
+
+  .toolbar-search.focused .toolbar-search-icon,
+  .toolbar-search.has-value .toolbar-search-icon {
+    filter: drop-shadow(0 0 4px rgba(255, 31, 61, 0.6));
+  }
+
+  .toolbar-search-key {
+    background-color: $pb-bg;
+    border-color: #2e2e33;
   }
 }
 /* stylelint-enable selector-class-pattern */

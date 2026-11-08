@@ -1,0 +1,27 @@
+// fork: the scene list with no scenes (Scenes/NoScenes.tsx): quiet, centred
+// under the pager.
+
+.no-scenes {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 4rem 1rem;
+  text-align: center;
+}
+
+.no-scenes-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.3;
+}
+
+.no-scenes-heading {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.no-scenes-hint {
+  margin: 0;
+  opacity: 0.6;
+}

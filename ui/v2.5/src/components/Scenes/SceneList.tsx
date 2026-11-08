@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import cloneDeep from "lodash-es/cloneDeep";
-import { FormattedMessage, useIntl } from "react-intl";
+import { useIntl } from "react-intl";
 import { useHistory, useLocation } from "react-router-dom";
 import Mousetrap from "mousetrap";
 import * as GQL from "src/core/generated-graphql";
@@ -15,7 +15,6 @@ import { EditScenesDialog } from "./EditScenesDialog";
 import { DeleteScenesDialog } from "./DeleteScenesDialog";
 import { GenerateDialog } from "../Dialogs/GenerateDialog";
 import { ExportDialog } from "../Shared/ExportDialog";
-import { SceneCardGrid } from "./SceneCardGrid";
 import { useShowThumbnails } from "../List/ThumbnailToggle";
 import { useMarkScenesViewed } from "./sceneViews";
 import { TaggerContext } from "../Tagger/context";
@@ -30,37 +29,20 @@ import { LoadedContent } from "../List/PagedList";
 import { useCloseEditDelete, useFilterOperations } from "../List/util";
 import { ListOperations } from "../List/ListOperationButtons";
 import { useFilteredItemList } from "../List/ItemList";
-import {
-  Sidebar,
-  SidebarPane,
-  SidebarPaneContent,
-  SidebarStateContext,
-  useSidebarState,
-} from "../Shared/Sidebar";
-import { SidebarPerformersFilter } from "../List/Filters/PerformersFilter";
-import { SidebarStudiosFilter } from "../List/Filters/StudiosFilter";
-import { SidebarTagsFilter } from "../List/Filters/TagsFilter";
 import cx from "classnames";
-import { SidebarRatingFilter } from "../List/Filters/RatingFilter";
-import { OrganizedCriterionOption } from "src/models/list-filter/criteria/organized";
-import { HasMarkersCriterionOption } from "src/models/list-filter/criteria/has-markers";
-import { SidebarBooleanFilter } from "../List/Filters/BooleanFilter";
-import { PerformerAgeCriterionOption } from "src/models/list-filter/scenes";
-import { SidebarDuplicateFilter } from "../List/Filters/DuplicateFilter";
-import { SidebarAgeFilter } from "../List/Filters/SidebarAgeFilter";
-import { SidebarDurationFilter } from "../List/Filters/SidebarDurationFilter";
-import {
-  FilteredSidebarHeader,
-  useFilteredSidebarKeybinds,
-} from "../List/Filters/FilterSidebar";
-import { PatchComponent, PatchContainerComponent } from "src/patch";
-import { Pagination, PaginationIndex } from "../List/Pagination";
-import { Button } from "react-bootstrap";
-import useFocus from "src/utils/focus";
+import { PatchComponent } from "src/patch";
+import { PaginationIndex } from "../List/Pagination";
+import { SteadyPagination } from "../List/SteadyPagination"; // fork
 import { useZoomKeybinds } from "../List/ZoomSlider";
 import { FilteredListToolbar } from "../List/FilteredListToolbar";
-import { FilterTags } from "../List/FilterTags";
-import { SidebarFolderFilter } from "../List/Filters/FolderFilter";
+import { FilterChips } from "../List/FilterChips"; // fork
+import {
+  sceneFiltersNotApplicable,
+  useSceneFilterChips,
+} from "./SceneFilterChips"; // fork
+import { SceneResults, useResultsTransition } from "./SceneResults"; // fork
+import { SceneGrid } from "./SceneGrid"; // fork
+import { NoScenes } from "./NoScenes"; // fork
 
 function renderMetadataByline(result: GQL.FindScenesQueryResult) {
   const duration = result?.data?.findScenes?.duration;
@@ -201,7 +183,8 @@ const SceneList: React.FC<{
 
     if (filter.displayMode === DisplayMode.Grid) {
       return (
-        <SceneCardGrid
+        // fork: a CSS grid, sized before the first paint (SceneGrid.tsx)
+        <SceneGrid
           scenes={scenes}
           queue={queue}
           zoomIndex={filter.zoomIndex}
@@ -247,113 +230,6 @@ const SceneList: React.FC<{
   }
 );
 
-const ScenesFilterSidebarSections = PatchContainerComponent(
-  "FilteredSceneList.SidebarSections"
-);
-
-const SidebarContent: React.FC<{
-  filter: ListFilterModel;
-  setFilter: (filter: ListFilterModel) => void;
-  filterHook?: (filter: ListFilterModel) => ListFilterModel;
-  view?: View;
-  sidebarOpen: boolean;
-  onClose?: () => void;
-  showEditFilter: (editingCriterion?: string) => void;
-  count?: number;
-  focus?: ReturnType<typeof useFocus>;
-}> = ({
-  filter,
-  setFilter,
-  filterHook,
-  view,
-  showEditFilter,
-  sidebarOpen,
-  onClose,
-  count,
-  focus,
-}) => {
-  const showResultsId =
-    count !== undefined ? "actions.show_count_results" : "actions.show_results";
-
-  const hideStudios = view === View.StudioScenes;
-
-  return (
-    <>
-      <FilteredSidebarHeader
-        sidebarOpen={sidebarOpen}
-        showEditFilter={showEditFilter}
-        filter={filter}
-        setFilter={setFilter}
-        view={view}
-        focus={focus}
-      />
-
-      <ScenesFilterSidebarSections>
-        {!hideStudios && (
-          <SidebarStudiosFilter
-            filter={filter}
-            setFilter={setFilter}
-            filterHook={filterHook}
-          />
-        )}
-        <SidebarPerformersFilter
-          filter={filter}
-          setFilter={setFilter}
-          filterHook={filterHook}
-        />
-        <SidebarTagsFilter
-          filter={filter}
-          setFilter={setFilter}
-          filterHook={filterHook}
-        />
-        <SidebarRatingFilter filter={filter} setFilter={setFilter} />
-        <SidebarDurationFilter filter={filter} setFilter={setFilter} />
-        <SidebarFolderFilter
-          text={<FormattedMessage id="folder" />}
-          filter={filter}
-          setFilter={setFilter}
-          sectionID="folder"
-        />
-        <SidebarBooleanFilter
-          title={<FormattedMessage id="hasMarkers" />}
-          data-type={HasMarkersCriterionOption.type}
-          option={HasMarkersCriterionOption}
-          filter={filter}
-          setFilter={setFilter}
-          sectionID="hasMarkers"
-        />
-        <SidebarBooleanFilter
-          title={<FormattedMessage id="organized" />}
-          data-type={OrganizedCriterionOption.type}
-          option={OrganizedCriterionOption}
-          filter={filter}
-          setFilter={setFilter}
-          sectionID="organized"
-        />
-        <SidebarDuplicateFilter
-          title={<FormattedMessage id="duplicated" />}
-          filter={filter}
-          setFilter={setFilter}
-          sectionID="duplicated"
-        />
-        <SidebarAgeFilter
-          title={<FormattedMessage id="performer_age" />}
-          option={PerformerAgeCriterionOption}
-          filter={filter}
-          setFilter={setFilter}
-          sectionID="performer_age"
-        />
-      </ScenesFilterSidebarSections>
-
-      <div className="sidebar-footer">
-        <Button className="sidebar-close-button" onClick={onClose}>
-          <FormattedMessage id={showResultsId} values={{ count }} />
-        </Button>
-      </div>
-    </>
-  );
-};
-
 interface IFilteredScenes {
   filterHook?: (filter: ListFilterModel) => ListFilterModel;
   defaultSort?: string;
@@ -369,18 +245,9 @@ export const FilteredSceneList = PatchComponent(
     const history = useHistory();
     const location = useLocation();
 
-    const searchFocus = useFocus();
-
     const { filterHook, defaultSort, view, alterQuery, fromGroupId } = props;
 
-    // States
-    const {
-      showSidebar,
-      setShowSidebar,
-      loading: sidebarStateLoading,
-      sectionOpen,
-      setSectionOpen,
-    } = useSidebarState(view);
+    const filterChips = useSceneFilterChips(view, filterHook); // fork
 
     const { filterState, queryResult, modalState, listSelect, showEditFilter } =
       useFilteredItemList({
@@ -402,6 +269,20 @@ export const FilteredSceneList = PatchComponent(
 
     const { effectiveFilter, result, cachedResult, items, totalCount } =
       queryResult;
+    const transition = useResultsTransition(items, result.loading, (scene) => [
+      scene.paths.screenshot,
+      scene.studio?.image_path,
+    ]); // fork
+    // fork: no scenes, once loaded (Scenes/NoScenes.tsx); none at all, not
+    // even searched or filtered for, on the main list is an empty library
+    const noScenes =
+      transition.phase === "in" &&
+      transition.shown.length === 0 &&
+      !result.loading &&
+      !result.error &&
+      effectiveFilter.displayMode !== DisplayMode.Tagger;
+    const emptyLibrary =
+      !filterHook && !filter.searchTerm && filter.criteria.length === 0;
 
     const {
       selectedIds,
@@ -419,16 +300,12 @@ export const FilteredSceneList = PatchComponent(
     const markViewed = useMarkScenesViewed(); // fork
 
     // Utility hooks
-    const { setPage, removeCriterion, clearAllCriteria } = useFilterOperations({
+    const { setPage } = useFilterOperations({
       filter,
       setFilter,
     });
 
     useAddKeybinds(effectiveFilter, totalCount);
-    useFilteredSidebarKeybinds({
-      showSidebar,
-      setShowSidebar,
-    });
 
     const onCloseEditDelete = useCloseEditDelete({
       closeModal,
@@ -559,7 +436,7 @@ export const FilteredSceneList = PatchComponent(
         text: intl.formatMessage({ id: "actions.play" }),
         onClick: () => onPlay(),
         isDisplayed: () => items.length > 0,
-        className: "play-item",
+        // fork: no play-item class, so it shows at every width (no ▶ button)
       },
       {
         text: intl.formatMessage(
@@ -640,8 +517,6 @@ export const FilteredSceneList = PatchComponent(
     ];
 
     // render
-    if (sidebarStateLoading) return null;
-
     const operations = (
       <ListOperations
         items={items.length}
@@ -649,7 +524,7 @@ export const FilteredSceneList = PatchComponent(
         operations={otherOperations}
         onEdit={onEdit}
         onDelete={onDelete}
-        onPlay={onPlay}
+        // fork: no onPlay, so no ▶ button; Play is in the ··· menu
         operationsMenuClassName="scene-list-operations-dropdown"
       />
     );
@@ -658,97 +533,112 @@ export const FilteredSceneList = PatchComponent(
       <TaggerContext>
         <div
           className={cx("item-list-container scene-list", {
-            "hide-sidebar": !showSidebar,
             "hide-thumbnails": !showThumbnails,
           })}
         >
           {modal}
 
-          <SidebarStateContext.Provider value={{ sectionOpen, setSectionOpen }}>
-            <SidebarPane hideSidebar={!showSidebar}>
-              <Sidebar hide={!showSidebar} onHide={() => setShowSidebar(false)}>
-                <SidebarContent
-                  filter={filter}
-                  setFilter={setFilter}
-                  filterHook={filterHook}
-                  showEditFilter={showEditFilter}
-                  view={view}
-                  sidebarOpen={showSidebar}
-                  onClose={() => setShowSidebar(false)}
-                  count={cachedResult.loading ? undefined : totalCount}
-                  focus={searchFocus}
+          {/* fork: the filter chips replace the sidebar and the filter tags */}
+          <div className="scene-list-content">
+            <FilteredListToolbar
+              filter={filter}
+              listSelect={listSelect}
+              setFilter={setFilter}
+              showEditFilter={showEditFilter}
+              showFilterButton={false}
+              onDelete={onDelete}
+              onEdit={onEdit}
+              operationComponent={operations}
+              view={view}
+              zoomable
+              showThumbnails={showThumbnails}
+              onSetShowThumbnails={setShowThumbnails}
+            />
+
+            {/* fork: the results count, pinned to the toolbar row's right end
+                in a wide window, selection or not (List/filter-chips.scss);
+                narrower, it stays under the pager */}
+            <div className="toolbar-trailing">
+              <div className="toolbar-results-index">
+                <PaginationIndex
+                  loading={cachedResult.loading}
+                  itemsPerPage={filter.itemsPerPage}
+                  currentPage={filter.currentPage}
+                  totalItems={totalCount}
+                  metadataByline={metadataByline}
                 />
-              </Sidebar>
-              <SidebarPaneContent
-                onSidebarToggle={() => setShowSidebar(!showSidebar)}
+              </div>
+            </div>
+
+            <FilterChips
+              filter={filter}
+              setFilter={setFilter}
+              chips={filterChips}
+              notApplicable={sceneFiltersNotApplicable(view)}
+              showEditFilter={showEditFilter}
+            />
+
+            <div className="pagination-index-container results-index-in-toolbar">
+              {/* fork: always there, so the cards below don't jump
+                  (List/SteadyPagination.tsx) */}
+              <SteadyPagination
+                currentPage={filter.currentPage}
+                itemsPerPage={filter.itemsPerPage}
+                totalItems={totalCount}
+                loading={cachedResult.loading}
+                onChangePage={(page) => setFilter(filter.changePage(page))}
+              />
+              <PaginationIndex
+                loading={cachedResult.loading}
+                itemsPerPage={filter.itemsPerPage}
+                currentPage={filter.currentPage}
+                totalItems={totalCount}
+                metadataByline={metadataByline}
+              />
+            </div>
+
+            {/* fork: the scenes shown fade out, and the new ones rise in, when
+                the results change (Scenes/SceneResults.tsx) */}
+            <LoadedContent loading={transition.waiting} error={result.error}>
+              <SceneResults
+                generation={transition.generation}
+                phase={transition.phase}
+                dim={transition.dim}
+                displayMode={effectiveFilter.displayMode}
               >
-                <FilteredListToolbar
-                  filter={filter}
-                  listSelect={listSelect}
-                  setFilter={setFilter}
-                  showEditFilter={showEditFilter}
-                  onDelete={onDelete}
-                  onEdit={onEdit}
-                  operationComponent={operations}
-                  view={view}
-                  zoomable
-                  showThumbnails={showThumbnails}
-                  onSetShowThumbnails={setShowThumbnails}
-                />
-
-                <FilterTags
-                  view={view}
-                  criteria={filter.criteria}
-                  onEditCriterion={(c) =>
-                    showEditFilter(c.criterionOption.type)
-                  }
-                  onRemoveCriterion={removeCriterion}
-                  onRemoveAll={clearAllCriteria}
-                />
-
-                <div className="pagination-index-container">
-                  <Pagination
-                    currentPage={filter.currentPage}
-                    itemsPerPage={filter.itemsPerPage}
-                    totalItems={totalCount}
-                    onChangePage={(page) => setFilter(filter.changePage(page))}
-                  />
-                  <PaginationIndex
-                    loading={cachedResult.loading}
-                    itemsPerPage={filter.itemsPerPage}
-                    currentPage={filter.currentPage}
-                    totalItems={totalCount}
-                    metadataByline={metadataByline}
-                  />
-                </div>
-
-                <LoadedContent loading={result.loading} error={result.error}>
+                {/* fork: no scenes says so (Scenes/NoScenes.tsx); the tagger
+                    has its own panel, as upstream */}
+                {noScenes ? (
+                  <NoScenes emptyLibrary={emptyLibrary} />
+                ) : (
                   <SceneList
                     filter={effectiveFilter}
-                    scenes={items}
+                    scenes={transition.shown}
                     selectedIds={selectedIds}
                     onSelectChange={onSelectChange}
                     fromGroupId={fromGroupId}
                   />
-                </LoadedContent>
-
-                {totalCount > filter.itemsPerPage && (
-                  <div className="pagination-footer-container">
-                    <div className="pagination-footer">
-                      <Pagination
-                        itemsPerPage={filter.itemsPerPage}
-                        currentPage={filter.currentPage}
-                        totalItems={totalCount}
-                        metadataByline={metadataByline}
-                        onChangePage={setPage}
-                        pagePopupPlacement="top"
-                      />
-                    </div>
-                  </div>
                 )}
-              </SidebarPaneContent>
-            </SidebarPane>
-          </SidebarStateContext.Provider>
+              </SceneResults>
+            </LoadedContent>
+
+            {/* fork: always there, pinned to the window
+                (List/SteadyPagination.tsx) */}
+            <div className="steady-pagination-footer-space">
+              <div className="pagination-footer-container steady-pagination-footer">
+                <div className="pagination-footer">
+                  <SteadyPagination
+                    itemsPerPage={filter.itemsPerPage}
+                    currentPage={filter.currentPage}
+                    totalItems={totalCount}
+                    loading={cachedResult.loading}
+                    onChangePage={setPage}
+                    pagePopupPlacement="top"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </TaggerContext>
     );

@@ -1,0 +1,28 @@
+// fork: the page always keeps room for its scrollbar, so centred content
+// (the list toolbar, chips, pager) doesn't shift ~7px when results stop or
+// start needing to scroll.
+html {
+  scrollbar-gutter: stable;
+}
+
+// react-bootstrap pads the page and the fixed navbar by the scrollbar's width
+// when a modal hides the scroll, to make up for the scrollbar going. The gutter
+// stays now, so that padding would shift them instead. Its inline styles need
+// !important; the navbar's are its own (index.scss .top-nav).
+/* stylelint-disable declaration-no-important -- overriding inline styles */
+body.modal-open {
+  padding-right: 0 !important;
+
+  .top-nav {
+    padding-right: 1rem !important;
+
+    @include media-breakpoint-down(xs) {
+      padding-right: 2rem !important;
+    }
+  }
+
+  .top-nav .navbar-toggler {
+    margin-right: 0 !important;
+  }
+}
+/* stylelint-enable declaration-no-important */

@@ -1146,11 +1146,15 @@
   "director": "Director",
   "disambiguation": "Disambiguation",
   "display_mode": {
+    "card_size": "Card size",
     "grid": "Grid",
     "label_current": "Display Mode: {current}",
     "list": "List",
+    "per_page": "Per page",
     "tagger": "Tagger",
+    "thumbnails": "Thumbnails",
     "unknown": "Unknown",
+    "view": "View",
     "wall": "Wall"
   },
   "distance": "Distance",
@@ -1482,12 +1486,17 @@
   "scenes": "Scenes",
   "scenes_updated_at": "Scene Updated At",
   "search_filter": {
+    "add_filter": "Filter",
     "edit_filter": "Edit Filter",
+    "more_filter_criteria": "+{count} more",
     "name": "Filter",
+    "no_results": "No results",
+    "no_scenes_yet": "No scenes yet",
+    "no_scenes_yet_hint": "Scan a library folder in {tasks}.",
     "saved_filters": "Saved filters",
     "search_term": "Search term",
-    "update_filter": "Update Filter",
-    "more_filter_criteria": "+{count} more"
+    "settings_tasks": "Settings → Tasks",
+    "update_filter": "Update Filter"
   },
   "second": "Second",
   "seconds": "Seconds",

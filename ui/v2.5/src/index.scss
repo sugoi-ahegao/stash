@@ -23,6 +23,14 @@ $sidebar-width: 250px;
 @import "components/Scenes/styles.scss";
 @import "components/Scenes/golden-card.scss";
 @import "components/Scenes/hold-to-generate.scss";
+@import "components/Scenes/scene-results.scss"; // fork
+@import "components/Scenes/scene-grid.scss"; // fork
+@import "components/List/steady-pagination.scss"; // fork
+@import "components/Scenes/no-scenes.scss"; // fork
+@import "components/List/display-options.scss"; // fork
+@import "components/List/filter-chips.scss"; // fork
+@import "components/List/toolbar-search.scss"; // fork
+@import "styles/page-gutter"; // fork
 @import "components/SceneDuplicateChecker/styles.scss";
 @import "components/SceneFilenameParser/styles.scss";
 @import "components/ScenePlayer/styles.scss";

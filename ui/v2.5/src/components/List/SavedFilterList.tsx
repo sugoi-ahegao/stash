@@ -388,6 +388,10 @@ interface ISavedFilterListProps {
   // event check, since useRootClose tests containment during capture, and by
   // the time the close arrives the clicked item may be gone.
   onOperationChosen?: () => void;
+  // fork: shown in the dropdown's button beside the bookmark, with a caret
+  toggleLabel?: React.ReactNode;
+  toggleCaret?: React.ReactNode;
+  toggleClassName?: string;
 }
 
 export interface ISavedFilterLoaded {
@@ -1203,8 +1207,10 @@ export const SavedFilterDropdown: React.FC<ISavedFilterListProps> = (props) => {
           </Tooltip>
         }
       >
-        <Dropdown.Toggle variant="secondary">
+        <Dropdown.Toggle variant="secondary" className={props.toggleClassName}>
           <Icon icon={faBookmark} />
+          {props.toggleLabel /* fork */}
+          {props.toggleCaret /* fork */}
         </Dropdown.Toggle>
       </OverlayTrigger>
       {props.menuPortalTarget

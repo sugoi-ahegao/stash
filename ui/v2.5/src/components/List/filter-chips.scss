@@ -1,0 +1,268 @@
+// fork: the filter chips row under the toolbar (List/FilterChips.tsx), the
+// toolbar's saved filter button, which names the saved filter shown
+// (List/activeSavedFilter.ts), and the scene list's results count at the
+// toolbar's right end. The pb theme's colours are in
+// styles/themes/_pb.scss.
+
+.filter-chips {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0.5rem 1rem 1.5rem;
+}
+
+.filter-chip {
+  align-items: stretch;
+  background-color: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  font-size: 0.875rem;
+  height: 2rem;
+  max-width: 100%;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+
+  &:hover,
+  &.open {
+    background-color: rgb(255 255 255 / 9%);
+    border-color: rgb(255 255 255 / 18%);
+  }
+
+  // a criterion is set: filled with the accent
+  &.set {
+    background-color: rgba($primary, 0.18);
+    border-color: rgba($primary, 0.6);
+
+    &:hover,
+    &.open {
+      background-color: rgba($primary, 0.28);
+    }
+  }
+}
+
+// icons are spaced by the gap, not the global .fa-icon side margins
+.filter-chip .fa-icon {
+  margin: 0;
+}
+
+.filter-chip-main,
+.filter-chip-remove {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  display: inline-flex;
+  min-width: 0;
+
+  &:focus-visible {
+    border-radius: 999px;
+    outline: 2px solid $primary;
+    outline-offset: -2px;
+  }
+}
+
+.filter-chip-main {
+  gap: 0.45rem;
+  padding: 0 0.95rem;
+
+  .filter-chip.set & {
+    padding-right: 0.35rem;
+  }
+}
+
+.filter-chip-caret {
+  font-size: 0.65rem;
+  opacity: 0.55;
+}
+
+.filter-chip-label {
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-chip-remove {
+  opacity: 0.6;
+  padding: 0 0.75rem 0 0.4rem;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+// "+ More": a dashed chip, quieter than the pinned ones
+.filter-chip-more {
+  .dropdown-toggle.filter-chip {
+    border-style: dashed;
+    box-shadow: none;
+    color: inherit;
+    opacity: 0.8;
+    text-decoration: none;
+
+    &::after {
+      display: none;
+    }
+
+    &:hover,
+    &:focus {
+      opacity: 1;
+    }
+  }
+
+  .filter-chip-more-menu {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+}
+
+.filter-chips-clear.btn-link {
+  color: $text-muted;
+  font-size: 0.85rem;
+  padding: 0 0.25rem;
+
+  &:hover {
+    color: inherit;
+  }
+}
+
+// A chip's editor is a sidebar section, open, without its header.
+.popover.filter-chip-popover {
+  max-width: calc(100vw - 2rem);
+  width: 20rem;
+
+  .popover-body {
+    padding: 0.85rem;
+  }
+
+  .sidebar-section {
+    border: 0;
+
+    > .collapse-header {
+      display: none;
+    }
+
+    .collapse,
+    .collapsing {
+      padding-top: 0;
+    }
+  }
+}
+
+// The saved filter button: bookmark, the active saved filter's name (or
+// "Saved filters", dimmed), chevron. Even padding both sides: the icons drop
+// the global .fa-icon side margins and the parts are spaced by the gap.
+// One fixed width whatever the name, so the row doesn't shift when it
+// changes; a longer name is ellipsised.
+.saved-filter-toggle.dropdown-toggle {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  width: 12rem;
+
+  > .fa-icon {
+    margin: 0;
+  }
+}
+
+.saved-filter-toggle-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  opacity: 0.7;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  .saved-filter-toggle.active & {
+    font-weight: 600;
+    opacity: 1;
+  }
+}
+
+.saved-filter-toggle > .saved-filter-caret {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  opacity: 0.6;
+}
+
+.saved-filter-toggle.active > .fa-icon:first-child {
+  color: $primary;
+}
+
+@include media-breakpoint-down(xs) {
+  .saved-filter-toggle.dropdown-toggle {
+    width: 9rem;
+  }
+}
+
+// The results count ("1-40 of 2,740 (duration - size)"): quiet, on one line.
+// In a narrow window it stays under the pager. In a wide one it's pinned to the right end of
+// the toolbar row, whether or not there's a selection. It can't live in the
+// toolbar: with a selection the toolbar is a sticky pill, and anything
+// positioned inside it is placed against the pill. So it's in a zero-height
+// anchor right after the toolbar (`.toolbar-trailing`, Scenes/SceneList.tsx),
+// sitting on the row's 3.5rem band; the toolbar keeps one height in both
+// modes so the band doesn't move. The count takes no room in the row, which
+// stays centred on the whole toolbar.
+$toolbar-row-height: 3.5rem;
+$toolbar-count-min-width: 1900px; // narrower, the row would reach the count
+
+.toolbar-results-index {
+  display: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
+
+  .paginationIndex {
+    margin: 0;
+  }
+
+  br {
+    display: none;
+  }
+}
+
+.toolbar-trailing {
+  height: 0;
+  position: relative;
+}
+
+.filtered-list-toolbar:has(+ .toolbar-trailing) {
+  // room under the navbar, with its padding
+  margin-top: 0.5rem;
+
+  // its padding (0.5rem each side) plus the row
+  min-height: calc(#{$toolbar-row-height} + 1rem);
+}
+
+// room between the pager and the scenes; padding, as a margin would collapse
+// into the pager's own
+.results-index-in-toolbar {
+  padding-bottom: 0.4rem;
+}
+
+@media (min-width: $toolbar-count-min-width) {
+  .toolbar-results-index {
+    display: block;
+  }
+
+  .results-index-in-toolbar .paginationIndex {
+    display: none;
+  }
+
+  .toolbar-trailing > .toolbar-results-index {
+    align-items: center;
+    bottom: 0.5rem;
+    display: flex;
+    height: $toolbar-row-height;
+    position: absolute;
+    right: 1rem;
+  }
+}

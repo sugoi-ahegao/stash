@@ -1,0 +1,125 @@
+// fork: how the scene list's results change (Scenes/SceneResults.tsx, which
+// sets the timings as custom properties on .scene-results, and each card's
+// place in the rising order as --i).
+//   .results-dim   the next results are loading: the cards on screen dim
+//   .results-out   they've loaded: the old cards sink and fade, all together
+//   .results-gone  away, keeping their space, for the moment before the swap
+//   .results-in    the new cards rise into their slots, in a diagonal wave
+// A rising card moves up by its own height while clip-path uncovers it from
+// its slot's bottom edge, both with the same easing, so it seems to come up
+// through that edge rather than over the cards below. The entrance's fill is
+// `backwards`, so nothing stays applied afterwards to fight the cards' own
+// hover transforms.
+
+$results-ease-in: cubic-bezier(0.22, 1, 0.36, 1); // rises fast, settles
+
+@keyframes results-card-in {
+  from {
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(100%) scale(0.85);
+  }
+
+  // just past its slot...
+  65% {
+    animation-timing-function: ease-in-out;
+    clip-path: inset(0 0 0 0);
+    transform: translateY(-8px) scale(1);
+  }
+
+  // ...and dropping into it
+  to {
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes results-card-out {
+  to {
+    transform: translateY(15%);
+  }
+}
+@keyframes results-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.scene-results {
+  &.results-dim {
+    opacity: 0.6;
+    pointer-events: none;
+
+    // a quick load doesn't flicker
+    transition: opacity 0.2s 0.15s;
+  }
+
+  &.results-out {
+    opacity: 0;
+    transition: opacity var(--results-out) ease-out;
+
+    // sinking as they fade
+    .scene-grid > .scene-card,
+    .wall-item {
+      animation: results-card-out var(--results-out) ease-out forwards;
+    }
+  }
+
+  &.results-gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &.results-in {
+    .scene-grid > .scene-card,
+    .wall-item {
+      animation: results-card-in var(--results-in) backwards;
+    }
+
+    // a table row doesn't move well; rows only fade
+    tbody > tr {
+      animation: results-fade-in var(--results-in) $results-ease-in backwards;
+    }
+
+    .scene-grid > .scene-card,
+    .wall-item,
+    tbody > tr {
+      animation-delay: calc(var(--i, 0) * var(--results-in-step));
+    }
+  }
+
+  // anything else (the tagger) fades in as a whole
+  &.results-in:not(:has(.scene-card, .wall-item, tbody > tr)) {
+    animation: results-fade-in var(--results-in) $results-ease-in;
+  }
+}
+
+// Thumbnails stay hidden until their image has loaded, then fade in, except
+// those loaded ahead of their cards (.img-preloaded), which rise with them. The
+// fade runs to whatever opacity the image would have anyway, so hidden
+// thumbnails (.hide-thumbnails) stay hidden.
+.scene-results img {
+  &:not(.img-ready, .img-preloaded) {
+    opacity: 0;
+  }
+
+  &.img-ready {
+    animation: results-fade-in 0.5s ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-results,
+  .scene-results .scene-card,
+  .scene-results .wall-item,
+  .scene-results tbody > tr,
+  .scene-results img {
+    animation: none !important; // stylelint-disable-line declaration-no-important
+    transition: none !important; // stylelint-disable-line declaration-no-important
+  }
+
+  .scene-results.results-gone,
+  .scene-results.results-out,
+  .scene-results img:not(.img-ready, .img-preloaded) {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,214 @@
+// fork: the list toolbar's search bar (List/ToolbarSearch.tsx), the row's
+// centrepiece: a wide pill that grows into the room the row has, with the
+// row's buttons as smaller pills beside it. The pb theme's colours are in
+// styles/themes/_pb.scss.
+
+$toolbar-search-height: 3.5rem;
+$toolbar-button-height: 3rem;
+
+.toolbar-search {
+  --toolbar-search-accent: #{$primary};
+  --toolbar-search-ring: #{rgba($primary, 0.28)};
+
+  align-items: center;
+  background-color: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 999px;
+  cursor: text;
+  display: flex;
+
+  // grows from a small basis, so the row wraps late and the bar takes what's
+  // left, up to its max
+  flex: 1 1 10rem;
+  gap: 0.7rem;
+  height: $toolbar-search-height;
+  max-width: 60rem;
+  min-width: 10rem;
+  overflow: hidden;
+  padding: 0 0.75rem 0 1.4rem;
+  position: relative;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.2s;
+
+  &:hover {
+    background-color: rgb(255 255 255 / 8%);
+    border-color: rgb(255 255 255 / 20%);
+  }
+
+  &.focused {
+    background-color: rgb(255 255 255 / 9%);
+    border-color: var(--toolbar-search-accent);
+    box-shadow:
+      0 0 0 3px var(--toolbar-search-ring),
+      0 10px 28px rgb(0 0 0 / 35%);
+  }
+
+  .fa-icon {
+    margin: 0;
+  }
+}
+
+.toolbar-search-icon {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  opacity: 0.5;
+  transition:
+    color 0.15s,
+    opacity 0.15s,
+    transform 0.2s;
+
+  .toolbar-search.focused &,
+  .toolbar-search.has-value & {
+    color: var(--toolbar-search-accent);
+    opacity: 1;
+  }
+
+  .toolbar-search.focused & {
+    transform: scale(1.08);
+  }
+}
+
+.toolbar-search-input {
+  background: none;
+  border: 0;
+  color: inherit;
+  flex: 1 1 auto;
+  font-size: 1.2rem;
+  height: 100%;
+  min-width: 0;
+  outline: none;
+  padding: 0;
+
+  &::placeholder {
+    color: inherit;
+    opacity: 0.45;
+    transition: opacity 0.15s;
+  }
+
+  .toolbar-search.focused &::placeholder {
+    opacity: 0.3;
+  }
+}
+
+// the "/" hint, only while empty and not focused
+.toolbar-search-key {
+  background-color: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-bottom-width: 2px;
+  border-radius: 0.35rem;
+  box-shadow: none;
+  color: inherit;
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  margin-right: 0.5rem;
+  opacity: 0.55;
+  padding: 0.2rem 0.45rem;
+}
+
+.toolbar-search-clear {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 2rem;
+  justify-content: center;
+  opacity: 0.6;
+  transition:
+    background-color 0.12s,
+    opacity 0.12s;
+  width: 2rem;
+
+  &:hover,
+  &:focus-visible {
+    background-color: rgb(255 255 255 / 10%);
+    opacity: 1;
+    outline: none;
+  }
+}
+
+// the row's buttons: pills, a group joined into one with a line between its
+// buttons (their own borders), and room around them
+.filtered-list-toolbar:has(> .toolbar-search) {
+  gap: 0.75rem;
+
+  > .dropdown > .btn,
+  > .toolbar-end > .btn,
+  > .toolbar-end > .btn-group > .btn,
+  > .toolbar-end > .btn-group > .input-group-prepend > .btn,
+  > .toolbar-end > .list-operations > .btn-group > .btn,
+  > .toolbar-end > .list-operations > .btn-group > .btn-group > .btn {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    height: $toolbar-button-height;
+    padding-left: 1.15rem;
+    padding-right: 1.15rem;
+  }
+
+  // a button with another after it in its group: flat on the right. The
+  // dropdown menus are also in the groups, so :last-child won't do.
+  .btn-group > .btn:has(~ .btn, ~ .btn-group),
+  .btn-group > .input-group-prepend:has(~ .btn) > .btn {
+    border-bottom-right-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  .btn-group > .btn ~ .btn,
+  .btn-group > .input-group-prepend ~ .btn,
+  .btn-group > .btn ~ .btn-group > .btn {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+  }
+}
+
+// The buttons after the search: just the row's own items, unless there's room
+// to balance the row.
+.toolbar-end {
+  display: contents;
+}
+
+// The two sides share the room evenly, whatever's in them, so the search is
+// centred. They hold their width, so a tight row squeezes the search instead.
+@include media-breakpoint-up(md) {
+  .filtered-list-toolbar:has(> .toolbar-search) {
+    > .toolbar-search {
+      flex: 0 1 60rem;
+    }
+
+    > .saved-filter-dropdown,
+    > .toolbar-end {
+      flex: 1 0 20rem;
+    }
+
+    > .saved-filter-dropdown {
+      justify-content: flex-end;
+
+      // its own width, not the side's
+      > .btn {
+        flex: 0 0 auto;
+      }
+    }
+
+    > .toolbar-end {
+      align-items: center;
+      display: flex;
+      gap: 0.75rem;
+    }
+  }
+}
+
+// a phone: the bar gets a row of its own, first
+@include media-breakpoint-down(xs) {
+  .toolbar-search {
+    flex-basis: 100%;
+    max-width: none;
+    order: -1;
+  }
+}
