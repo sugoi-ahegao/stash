@@ -263,7 +263,8 @@ How the copy is made, and why it's safe:
                        (pkg/scene/generate/generator.go:100), and blobs are named by
                        checksum. A worktree replacing or deleting a file only affects
                        its own link.
-  config.yml   copied, with absolute paths, its own port, DLNA off
+  config.yml   copied, with absolute paths, its own port, DLNA off, no login
+                       (username and password removed)
 ```
 
 ⚠️ **Media is shared and unprotected.** Deleting a scene *with its file* in a worktree or

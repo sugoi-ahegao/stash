@@ -18,6 +18,8 @@
 #               replacing or deleting a file only touches its own link.
 #   plugins, scrapers, media    shared. Deleting a scene "with file" deletes the real video.
 #
+# The copied config has no username or password, so a worktree never asks for a login.
+#
 # Usage: scripts/worktree <command> [args]   (run with no arguments for help)
 
 set -euo pipefail
@@ -134,6 +136,8 @@ snapshot() {
 	set_key "$data/config.yml" nobrowser true
 	# production owns the DLNA port and the network's DLNA discovery
 	sed -i '/^dlna:/,/^[^ ]/ s/^\(    default_enabled:\).*/\1 false/' "$data/config.yml"
+	# no login: stash only asks for one when both username and password are set
+	sed -i -E '/^(username|password):/d' "$data/config.yml"
 }
 
 # write_ui_env WT SERVER UI: point the worktree's vite dev server at its own backend
