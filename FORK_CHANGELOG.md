@@ -12,7 +12,9 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 ## 2026-11-08
 
+- feat(scripts): add video-check, to find corrupted videos with ffmpeg `001193e56`
 - feat(ui): scene list header rework: big centred search, filter chips, steady pagers and animated results `17cbd4fa4`
+- fix(scripts): remove the login from worktree configs `69f94013d`
 
 ## 2026-11-02
 
