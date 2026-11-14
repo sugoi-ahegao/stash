@@ -16,25 +16,27 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 - feat(scripts): date changelog entries at merge, and link entries written after their merge `d483e9a3b` ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
 - feat(scripts): a changelog entry per merge into main, and a hook that renumbers clashing decisions `6ee68a5b2`
+- tune(scripts): new worktrees ready in ~8 s instead of ~45 s `2e2dc0523`
 - refactor(scripts): drop automatic re-dating of changelog entries at merge `59aa015e9`
+- docs(fork-changelog): backfill entries for past merges into main `d724579eb` ([details](docs/fork-changelog/2026-08-28-feat-ui-landing-featured-carousel.md))
 
 ## 2026-11-08
 
 - **upstream sync**: merged stashapp/stash `develop` at `aefc9373` (14 upstream commits) `44767c45f`. What they changed is in upstream's changelog, not here ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
 - feat(scripts): add video-check, to find corrupted videos with ffmpeg `001193e56`
-- feat(ui): scene list header rework: big centred search, filter chips, steady pagers and animated results `17cbd4fa4`
+- feat(ui): scene list header rework: big centred search, filter chips, steady pagers and animated results `17cbd4fa4` ([details](docs/fork-changelog/2026-11-08-feat-search-bar-2-ui.md))
 - fix(scripts): remove the login from worktree configs `69f94013d`
 
 ## 2026-11-02
 
-- feat(ui): hold a scene card to generate a fresh preview `124ba8d51`
+- feat(ui): hold a scene card to generate a fresh preview `124ba8d51` ([details](docs/fork-changelog/2026-11-02-feat-ui-hold-to-generate.md))
 
 ## 2026-10-24
 
-- **upstream sync**: merged stashapp/stash `develop` at `bdee3c83` (44 upstream commits) `8cf477772`. What they changed is in upstream's changelog, not here
-- feat(ui): instant view eye, shut until viewed today, and mark a page viewed `0330a155c`
-- feat(ui): library settings for the featured group, golden tag and intake folder `38fa82a5d`
-- feat(ui): theme switcher, the pb theme, and scene card previews `cd5271aa7`
+- **upstream sync**: merged stashapp/stash `develop` at `bdee3c83` (44 upstream commits) `8cf477772`. What they changed is in upstream's changelog, not here ([details](docs/fork-changelog/2026-10-24-upstream-sync-20261024.md))
+- feat(ui): instant view eye, shut until viewed today, and mark a page viewed `0330a155c` ([details](docs/fork-changelog/2026-10-24-feat-improve-views.md))
+- feat(ui): library settings for the featured group, golden tag and intake folder `38fa82a5d` ([details](docs/fork-changelog/2026-10-24-feat-ui-library-settings.md))
+- feat(ui): theme switcher, the pb theme, and scene card previews `cd5271aa7` ([details](docs/fork-changelog/2026-10-24-feat-theme-switcher.md))
 - feat(scripts): add dev, to run this checkout's backend and UI `4a9e63b30`
 - feat(scripts): give every worktrunk worktree its own library and ports `d77ff7009`
 - feat(scripts): add upstream-sync, and document keeping up with upstream `7726f769d`
@@ -45,11 +47,11 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - refactor(sqlite,api): move view history into fork-owned files `71bf7466d`
 - refactor(scripts): drop preview worktrees from dev `a441988bb`
 - refactor(api): reduce the fork's resolver changes to call sites `35bc891b3`
-- revert(ui): remove the Collections display mode `405acf8e9`
+- revert(ui): remove the Collections display mode `405acf8e9` ([details](docs/fork-changelog/2026-10-24-revert-ui-collections.md))
 - docs: fork settings, golden cards, view-history layout `7d66983f9`
 - docs, scripts: follow checkouts into stash.worktrees/ `05113d885`
 - chore(scripts): check plain file paths in doc-refs `aab3ff771`
-- chore: add CLAUDE.md, scripts/check, decision records and agent tooling `bffeb8dfd`
+- chore: add CLAUDE.md, scripts/check, decision records and agent tooling `bffeb8dfd` ([details](docs/fork-changelog/2026-10-24-chore-agent-tooling.md))
 - chore(stashbox): restore upstream's generated models `fa3a2a3df`
 - chore(scripts): add production and preview tooling `f70bf6b0e`
 - test(scene): expect GetViewedDates in the export test `602045543`
@@ -60,7 +62,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - feat(ui): open the landing page at the site root `1c97eee17`
 - feat(ui): add a Collections display mode for the scene list `5121c72c4`
 - feat(ui): surface view history, and give plays back to the player `328c9459a`
-- feat(scene): record view history separately from play history `a975079a1`
+- feat(scene): record view history separately from play history `a975079a1` ([details](docs/fork-changelog/2026-09-21-feat-scene-view-history.md))
 - fix(ui): pause the featured carousel while the pointer is on it `b8f222624`
 - tune(ui): shorten the featured unlock window to 2 days `6dbf7f5c7`
 - chore(sqlite): allow non-contiguous migration versions `dafff9c09`
@@ -73,7 +75,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 - feat(ui): add a mark-played button to scene cards `073b0b4cb`
 - feat(ui): count a dwell on a landing card as a play `a4f6e0d92`
-- feat(ui): add a featured toggle to the scene page `979461950`
+- feat(ui): add a featured toggle to the scene page `979461950` ([details](docs/fork-changelog/2026-09-10-feat-ui-featured-toggle-and-plays.md))
 
 ## 2026-09-08
 
@@ -81,7 +83,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - feat(ui): ignite the golden card instead of fading it in `d8e9ef6a6`
 - feat(ui): burn the golden card with a drawn flame sprite `15b7c061f`
 - feat(ui): burn the golden card instead of gilding it `89d61c00e`
-- feat(ui): give golden scenes a metal card treatment `1989a6e98`
+- feat(ui): give golden scenes a metal card treatment `1989a6e98` ([details](docs/fork-changelog/2026-09-08-feat-ui-golden-cards.md))
 - feat(ui): shorten the carousel slide duration to 15s `d8ef648b4`
 - docs: document parallel experiments on one library `1b4740b47`
 - chore: ignore Python build artefacts `411d6edd9`
@@ -93,7 +95,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - feat(ui): only show carousel slides you can actually open `1b219a870`
 - feat(ui): flatten the top navbar and shorten featured slides `85c10c8f4`
 - feat(generate): raise scene preview width to 1920 `4a766f004`
-- feat(api): run the featured-group lifecycle server-side `ff06f5f2d`
+- feat(api): run the featured-group lifecycle server-side `ff06f5f2d` ([details](docs/fork-changelog/2026-09-03-feat-api-featured-lifecycle-server-side.md))
 - fix(generate): cap preview width instead of scaling to it `69621d64f`
 - docs: document the server lifecycle and carousel display rules `259d79f7d`
 
@@ -116,7 +118,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 - feat(ui): add thumbnail visibility toggle to scene grid toolbar `783b70a1a`
 - feat(ui): support relative date expressions in timestamp filters `731b57dfc`
-- feat(ui): add landing page with featured scene carousel `d482e93c5`
+- feat(ui): add landing page with featured scene carousel `d482e93c5` ([details](docs/fork-changelog/2026-08-28-feat-ui-landing-featured-carousel.md))
 - fix(ui): make featured carousel span full width edge-to-edge `aa1c19761`
 - chore(stashbox): regenerate GraphQL models `fa0ee396c`
 - style(ui): fade in hidden scene thumbnails and highlight card on hover `ba04ea6ad`
