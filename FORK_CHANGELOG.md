@@ -14,10 +14,12 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 ## 2026-11-13
 
+- feat(scripts): date changelog entries at merge, and link entries written after their merge `d483e9a3b` ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
 - feat(scripts): a changelog entry per merge into main, and a hook that renumbers clashing decisions `6ee68a5b2`
 
 ## 2026-11-08
 
+- **upstream sync**: merged stashapp/stash `develop` at `aefc9373` (14 upstream commits) `44767c45f`. What they changed is in upstream's changelog, not here ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
 - feat(scripts): add video-check, to find corrupted videos with ffmpeg `001193e56`
 - feat(ui): scene list header rework: big centred search, filter chips, steady pagers and animated results `17cbd4fa4`
 - fix(scripts): remove the login from worktree configs `69f94013d`
