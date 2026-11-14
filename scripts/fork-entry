@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+# Write the fork changelog entry for this branch: one file in docs/fork-changelog/ that
+# says what the branch changes, how, what was tried and dropped on the way, and what to
+# watch for. It's written on the branch *before* it's squash-merged into main, so it lands
+# in the same commit as the work. FORK_CHANGELOG.md links each commit to the entry it adds.
+#
+# The scaffold fills in what git knows (commits with their bodies, footprint, migrations,
+# docs touched, uncommitted files) and leaves TODO markers where only the author knows. The
+# entry isn't done until no TODO is left; --check enforces that.
+#
+# Upstream's in-app changelog (ui/v2.5/src/docs/en/Changelog/) is a different thing and is
+# never touched. See docs/fork-changelog/README.md.
+#
+# Usage: scripts/fork-entry           scaffold this branch's entry (never overwrites)
+#        scripts/fork-entry --path    print this branch's entry path, if there is one
+#        scripts/fork-entry --check   exit 1 unless the entry exists with no TODO left
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+MAIN=main-sugoi-ahegao
+DIR=docs/fork-changelog
+UPDATE_SUBJECT="chore(changelog): update FORK_CHANGELOG.md"
+
+die() { echo "fork-entry: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+branch="$(git symbolic-ref --short -q HEAD)" || die "not on a branch"
+[[ "$branch" != "$MAIN" ]] || die "on $MAIN; write the entry on the branch being merged"
+git rev-parse -q --verify "$MAIN" >/dev/null || die "no $MAIN branch"
+slug="${branch//\//-}"
+
+# this branch's entry: any date, same slug
+existing() {
+	compgen -G "$DIR/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-$slug.md" | sort | tail -1 || true
+}
+
+commits() {
+	git log --no-merges --reverse --format='%H' "$MAIN..HEAD" |
+		while read -r hash; do
+			[[ "$(git log -1 --format=%s "$hash")" == "$UPDATE_SUBJECT" ]] && continue
+			echo "$hash"
+		done
+}
+
+scaffold() {
+	local base hashes hash body changed uncommitted
+	base="$(git merge-base "$MAIN" HEAD)"
+	hashes="$(commits)"
+	changed="$(git diff --name-only "$base" HEAD)"
+	# the fork's docs this branch touched (not entries, not upstream's in-app docs)
+	docs="$({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u |
+		grep -E '(\.md$|^\.claude/skills/)' | grep -vE "^($DIR/|ui/v2.5/src/docs/|FORK_CHANGELOG.md$)" || true)"
+
+	cat <<EOF
+# TODO: what this branch does, as a title a reader would search for
+
+\`$branch\` · merged into \`$MAIN\` $(date +%F) · $(printf '%s' "$hashes" | grep -c . || true) commits
+
+## What changed
+
+<!-- TODO: what someone using stash notices, one bullet each. Not file names. -->
+
+## How it works
+
+<!-- TODO: the entry points and the moving parts: where to start reading, what calls what,
+where the data lives. Link docs/codebase/ instead of repeating it. -->
+
+## Tried and changed
+
+<!-- TODO: the do/undo/tweak history. Each approach that was tried and dropped, and why
+the final one won; values that were tuned and what they were. If a choice would look
+reasonable to undo, it belongs in docs/decisions/ too. Write "nothing notable" if so. -->
+
+## Watch out
+
+<!-- TODO: migrations, config or settings to set, things production needs, known gaps
+and bugs left in. Write "nothing" if so. -->
+
+## Follow-ups
+
+<!-- TODO: what's left to do, or "none". -->
+
+## Docs updated
+
+EOF
+	if [[ -n "$docs" ]]; then
+		echo "Touched on this branch so far:"
+		echo
+		sed 's/.*/- `&`/' <<<"$docs"
+	else
+		echo "_None touched on this branch so far._"
+	fi
+	cat <<EOF
+
+<!-- TODO: every doc this branch makes untrue must be updated before the merge. Go through
+docs/codebase/ (its README says which doc covers what), docs/decisions/, CLAUDE.md,
+.claude/skills/ and any README next to the code. Add a decision in docs/decisions/ for each
+major choice made on the branch. Then replace this note with one line per doc: what was
+updated and why, or "none needed" with the reason. -->
+
+## Commits
+
+EOF
+	if [[ -z "$hashes" ]]; then
+		echo "_No commits yet._"
+	fi
+	for hash in $hashes; do
+		echo "- $(git log -1 --format='%s `%h`' "$hash")"
+		body="$(git log -1 --format=%b "$hash" | grep -v '^Co-Authored-By:' | cat -s |
+			sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')"
+		[[ -n "${body//[[:space:]]/}" ]] && sed 's/^/  > /' <<<"$body"
+	done
+
+	echo
+	echo "## Footprint"
+	echo
+	echo '```'
+	git diff --stat=100 "$base" HEAD | tail -1 | sed 's/^ *//'
+	git diff --dirstat=files,5 "$base" HEAD | sed 's/^ *//'
+	echo '```'
+
+	if grep -q '^pkg/sqlite/migrations_fork/' <<<"$changed"; then
+		echo
+		echo "Fork migrations:"
+		grep '^pkg/sqlite/migrations_fork/' <<<"$changed" | sed 's/.*/- `&`/'
+	fi
+	if grep -q '^pkg/sqlite/migrations/' <<<"$changed"; then
+		echo
+		echo "**Upstream migrations changed** (should only happen in an upstream sync):"
+		grep '^pkg/sqlite/migrations/' <<<"$changed" | sed 's/.*/- `&`/'
+	fi
+
+	uncommitted="$({ git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u | grep -v "^$DIR/" || true)"
+	if [[ -n "$uncommitted" ]]; then
+		echo
+		echo "<!-- TODO: these files were uncommitted when this entry was scaffolded. Commit them"
+		echo "before merging (and describe them above), or say why they stay out. Then delete"
+		echo "this note."
+		sed 's/^/  /' <<<"$uncommitted"
+		echo "-->"
+	fi
+}
+
+case "${1:-}" in
+"")
+	path="$(existing)"
+	[[ -z "$path" ]] || die "$path already exists; edit it (it's never overwritten)"
+	mkdir -p "$DIR"
+	path="$DIR/$(date +%F)-$slug.md"
+	scaffold >"$path"
+	info "Wrote $path"
+	echo "    Fill in every TODO, then: scripts/fork-entry --check"
+	;;
+--path)
+	path="$(existing)"
+	[[ -n "$path" ]] || die "no entry for $branch yet; run scripts/fork-entry"
+	echo "$path"
+	;;
+--check)
+	path="$(existing)"
+	[[ -n "$path" ]] || die "no entry for $branch in $DIR/; run scripts/fork-entry"
+	if grep -n 'TODO' "$path"; then
+		die "$path still has TODO markers (above)"
+	fi
+	info "$path is complete"
+	;;
+-h | --help) sed -n '2,/^$/s/^# \{0,1\}//p' "$0" ;;
+*) die "unknown argument '$1' (scripts/fork-entry [--path|--check])" ;;
+esac

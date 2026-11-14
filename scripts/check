@@ -9,6 +9,7 @@
 #   ui           biome lint, stylelint, tsc, biome format (pnpm validate, step by step)
 #   migrations   the fork's migration rules (scripts/upstream-sync check)
 #   docs         file paths, file:line references and links in the fork's docs (scripts/doc-refs)
+#   decisions    no two docs/decisions/ files share a number (scripts/decision-numbers)
 #   changelog    FORK_CHANGELOG.md is current (a warning only: it trails every commit)
 #
 # Every step runs even if an earlier one fails, and a summary comes last.
@@ -143,6 +144,9 @@ run migrations scripts/upstream-sync check
 
 info "docs"
 run docs scripts/doc-refs
+
+info "decisions"
+run decisions scripts/decision-numbers --check
 
 info "changelog"
 if scripts/changelog --check; then

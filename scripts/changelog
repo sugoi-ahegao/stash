@@ -20,6 +20,9 @@
 #   scripts/changelog                              regenerate
 #   git commit -m "chore(changelog): update FORK_CHANGELOG.md" FORK_CHANGELOG.md
 #
+# A commit that adds an entry in docs/fork-changelog/ (a branch's squash merge, written with
+# scripts/fork-entry) gets a link to it: the subject is the index, the entry the detail.
+#
 # Commits with exactly that last subject are left out, so updating the changelog doesn't
 # add an entry of its own. Updating once per batch of work (before a ship, after an upstream
 # sync) is enough; it doesn't need a commit per commit.
@@ -36,6 +39,8 @@ UPSTREAM_REF=upstream/develop
 OUT=FORK_CHANGELOG.md
 # commits that only regenerate $OUT are left out of it
 UPDATE_SUBJECT="chore(changelog): update FORK_CHANGELOG.md"
+# one file per branch merged into main (scripts/fork-entry); a commit adding one links it
+ENTRIES=docs/fork-changelog
 # section order within a day; anything else sorts last
 TYPES=(feat fix tune perf refactor revert docs scripts chore test style build)
 
@@ -52,12 +57,15 @@ rank() {
 
 # one line per entry: date <tab> rank <tab> markdown
 entries() {
-	local hash date subject type merged count
+	local hash date subject type merged count entry
 	while IFS=$'\t' read -r hash date subject; do
 		[[ "$subject" =~ ^([a-z]+)[a-z,\ ]*(\([^\)]*\))?!?:\  ]] || continue
 		type="${BASH_REMATCH[1]}"
 		[[ "$subject" == "$UPDATE_SUBJECT" ]] && continue # this script's own output
-		printf '%s\t%s\t- %s `%s`\n' "$date" "$(rank "$type")" "$subject" "$hash"
+		entry="$(git diff-tree --no-commit-id --name-only --diff-filter=A -r "$hash" -- "$ENTRIES/" |
+			grep -E "^$ENTRIES/[0-9]{4}-[0-9]{2}-[0-9]{2}-.*\.md$" | head -1 || true)"
+		printf '%s\t%s\t- %s `%s`%s\n' "$date" "$(rank "$type")" "$subject" "$hash" \
+			"${entry:+ ([details]($entry))}"
 	done < <(git log --no-merges --format='%h%x09%ad%x09%s' --date=short "$UPSTREAM_REF..HEAD")
 
 	while IFS=$'\t' read -r hash date subject; do
@@ -84,6 +92,8 @@ What this fork (\`main-sugoi-ahegao\`) changed on top of upstream stash, newest 
   [\`ui/v2.5/src/docs/en/Changelog/\`](ui/v2.5/src/docs/en/Changelog/), which the app shows.
   Never add fork entries there.
 - Last upstream commit merged: \`$(git describe --tags --match 'v[0-9]*' --always "$base")\` ($base_date).
+- Each branch merged into main has an entry in [\`docs/fork-changelog/\`](docs/fork-changelog/):
+  what it changed, how, and what was tried and dropped. Lines link to theirs.
 - What the fork's features are and how they work: [\`docs/codebase/07-this-fork.md\`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [\`docs/decisions/\`](docs/decisions/).
 EOF

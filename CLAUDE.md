@@ -56,8 +56,10 @@ make generate            # after any schema or ui/v2.5/graphql change
 scripts/dev server       # this checkout's backend (main checkout :9998); restart after Go changes
 scripts/dev ui           # Vite UI (main checkout :3998), hot-reloads
 scripts/worktree ls      # every checkout, its ports, what's running
+scripts/fork-entry       # scaffold this branch's docs/fork-changelog/ entry (before merging to main)
 scripts/changelog        # regenerate FORK_CHANGELOG.md (after committing)
 scripts/prod status      # what production runs (read-only)
+scripts/git-hooks/install  # once per clone: the fork's git hooks (pre-commit renumbers clashing decisions)
 ```
 
 Go tests need the SQLite build tags. `scripts/check` passes them; by hand, use
@@ -68,6 +70,7 @@ Go tests need the SQLite build tags. `scripts/check` passes them; by hand, use
 - `run-and-verify`: start the app and look at a change with Playwright. Do this for UI
   changes before saying they work.
 - `add-field`: new stored or queryable data, end to end, the fork's way.
+- `merge-to-main`: write a branch's changelog entry, then squash it into main.
 - `ship-to-prod`: ship this checkout to production.
 - `upstream-sync`: merge upstream stash in its own worktree.
 
@@ -79,6 +82,13 @@ commit the file as `chore(changelog): update FORK_CHANGELOG.md` (that exact subj
 left out of the changelog). `ui/v2.5/src/docs/en/Changelog/` is **upstream's** release notes,
 shown in the app. Never put fork changes there.
 ([0007](docs/decisions/0007-fork-changelog.md))
+
+**Before any branch is merged into main**, it gets an entry in `docs/fork-changelog/`
+(`scripts/fork-entry`, the `merge-to-main` skill): what it changed, how, and what was
+tried and dropped. The squash commit carries it, and `FORK_CHANGELOG.md` links it.
+In the same pass, before merging, update **every** doc the branch makes untrue
+(`docs/codebase/`, `CLAUDE.md`, skills, READMEs) and add a `docs/decisions/` record for
+each major choice. `docs/decisions/` stays for major decisions only.
 
 ## Keeping docs true
 

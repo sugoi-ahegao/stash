@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""Keep docs/decisions/ numbers unique.
+
+Branches number their decisions independently, so merging two of them into main can leave
+two 0008s. The one already committed keeps its number; each newcomer takes the next free
+one. Renumbering renames the file, fixes its heading, its row in the README table (rows
+are kept in order), and every link to it in tracked files: the path, and link text that
+is just the number ("[0008](.../0008-x.md)").
+
+Run by the pre-commit hook (scripts/git-hooks/pre-commit) with --fix-staged, which works
+on the index and restages what it changes. scripts/check runs --check.
+
+Usage: scripts/decision-numbers --check         exit 1 if two decisions share a number
+       scripts/decision-numbers --fix-staged    renumber clashes in what's being committed
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+DIR = "docs/decisions"
+NAME = re.compile(rf"^{DIR}/(\d{{4}})-[^/]+\.md$")
+
+
+def git(*args, check=True):
+    return subprocess.run(["git", *args], check=check, capture_output=True, text=True).stdout
+
+
+def decisions():
+    """number -> [paths] for the decisions in the index"""
+    found = {}
+    for path in git("ls-files", "--", f"{DIR}/").splitlines():
+        m = NAME.match(path)
+        if m:
+            found.setdefault(m.group(1), []).append(path)
+    return found
+
+
+def in_head(path):
+    return subprocess.run(["git", "cat-file", "-e", f"HEAD:{path}"], capture_output=True).returncode == 0
+
+
+def clashes(found):
+    return {n: sorted(p) for n, p in found.items() if len(p) > 1}
+
+
+def unstaged(path):
+    return bool(git("diff", "--name-only", "--", path).strip())
+
+
+def renumber(old_path, new_num):
+    old_num = NAME.match(old_path).group(1)
+    base = os.path.basename(old_path)
+    new_base = new_num + base[4:]
+    new_path = f"{DIR}/{new_base}"
+
+    # every tracked file that links to it, plus the README table
+    referrers = set(git("grep", "--cached", "-l", "-F", base, check=False).splitlines())
+    referrers.add(f"{DIR}/README.md")
+    referrers.discard(old_path)
+    dirty = [p for p in [old_path, *referrers] if os.path.exists(p) and unstaged(p)]
+    if dirty:
+        sys.exit(
+            f"decision-numbers: can't renumber {old_path}: unstaged changes in "
+            + ", ".join(dirty)
+            + ". Stage or stash them, then commit again."
+        )
+
+    git("mv", old_path, new_path)
+
+    link_text = re.compile(rf"\[{old_num}\]\(([^)]*?){re.escape(base)}\)")
+    for path in [new_path, *sorted(referrers)]:
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            text = f.read()
+        new = link_text.sub(lambda m: f"[{new_num}]({m.group(1)}{new_base})", text)
+        new = new.replace(base, new_base)
+        if path == new_path:
+            new = re.sub(rf"^# {old_num}\b", f"# {new_num}", new, count=1, flags=re.M)
+        if path == f"{DIR}/README.md":
+            new = fix_table(new, old_num, new_num, new_base)
+        if new != text:
+            with open(path, "w") as f:
+                f.write(new)
+            git("add", path)
+    print(f"decision-numbers: {old_path} -> {new_path} (number {old_num} was taken)")
+
+
+def fix_table(text, old_num, new_num, new_base):
+    """renumber the row linking new_base, and keep the table's rows in number order"""
+    lines = text.split("\n")
+    rows = [i for i, l in enumerate(lines) if re.match(r"^\| \d{4} \|", l)]
+    for i in rows:
+        if f"({new_base})" in lines[i]:
+            lines[i] = lines[i].replace(f"| {old_num} |", f"| {new_num} |", 1)
+    if rows and rows == list(range(rows[0], rows[0] + len(rows))):
+        lines[rows[0] : rows[-1] + 1] = sorted(lines[rows[0] : rows[-1] + 1], key=lambda l: l[2:6])
+    return "\n".join(lines)
+
+
+def main():
+    os.chdir(git("rev-parse", "--show-toplevel").strip())
+    mode = sys.argv[1] if len(sys.argv) > 1 else ""
+    found = decisions()
+    bad = clashes(found)
+
+    if mode == "--check":
+        for num, paths in sorted(bad.items()):
+            print(f"decision-numbers: {num} is used by " + ", ".join(paths), file=sys.stderr)
+        if bad:
+            sys.exit("decision-numbers: renumber the newer one (the pre-commit hook does it on commit)")
+        print("==> Decision numbers are unique")
+        return
+
+    if mode != "--fix-staged":
+        sys.exit(__doc__.strip().split("Usage: ", 1)[1])
+
+    taken = {int(n) for n in found}
+    for num, paths in sorted(bad.items()):
+        # the committed one keeps the number; if none is, the first by name does
+        keep = next((p for p in paths if in_head(p)), paths[0])
+        for path in paths:
+            if path == keep:
+                continue
+            nxt = max(taken) + 1
+            taken.add(nxt)
+            renumber(path, f"{nxt:04d}")
+
+
+if __name__ == "__main__":
+    main()

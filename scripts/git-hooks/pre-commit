@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# The fork's pre-commit hook. Installed for every checkout by scripts/git-hooks/install,
+# which points core.hooksPath here.
+#
+#   decision numbers   two docs/decisions/ files with one number (after merging branches
+#                      that each wrote an 0008): the newer one takes the next free number,
+#                      with its links and README row, and is restaged into this commit.
+
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+# only when a decision is part of this commit
+if git diff --cached --name-only --diff-filter=ACR -- docs/decisions/ | grep -qE '/[0-9]{4}-'; then
+	scripts/decision-numbers --fix-staged
+fi

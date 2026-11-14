@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Use the fork's git hooks (scripts/git-hooks/) in every checkout of this repository.
+#
+# core.hooksPath is shared by all worktrees and is relative, so each checkout runs the
+# hooks of its own branch. A branch from before the hooks existed simply has none.
+#
+# Usage: scripts/git-hooks/install
+
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+git config core.hooksPath scripts/git-hooks
+echo "==> core.hooksPath = scripts/git-hooks (all checkouts)"

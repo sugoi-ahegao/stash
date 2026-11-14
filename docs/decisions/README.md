@@ -18,7 +18,10 @@ purpose. Each one is short: the problem, what was chosen, what it costs.
 
 Write one when you choose between real alternatives and the losing one would look
 reasonable to someone who wasn't there — especially if it's what the code would naturally
-drift back to. Number it next, link it in the table, and keep it under a page:
+drift back to. Number it next, link it in the table, and keep it under a page. Branches number
+theirs independently, so if a number is already taken on main when a branch merges, the
+branch's takes the next free one. The pre-commit hook does that, links included
+(`scripts/decision-numbers`):
 
 ```markdown
 # NNNN — <the decision, as a statement>

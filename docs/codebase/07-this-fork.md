@@ -3,7 +3,9 @@
 Everything that diverges from upstream `develop` on this branch, why it works the way it
 does, and what's load-bearing if you build on it.
 
-What changed and when is in [`FORK_CHANGELOG.md`](../../FORK_CHANGELOG.md). The current
+What changed and when is in [`FORK_CHANGELOG.md`](../../FORK_CHANGELOG.md), and each
+merged branch's story (including what was tried and dropped) in
+[`docs/fork-changelog/`](../fork-changelog/README.md). The current
 size of the divergence is a command, not a number to copy here:
 
 ```bash

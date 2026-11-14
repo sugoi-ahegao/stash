@@ -13,6 +13,8 @@ Background: [`docs/codebase/11-production-and-dev.md`](../../../docs/codebase/11
 
 ## Before
 
+0. Production ships from `main-sugoi-ahegao` only. Shipping a branch means merging it
+   first with the `merge-to-main` skill, which writes its changelog entry.
 1. `scripts/prod status`: what production runs, and how far this checkout differs. It's
    read-only, so run it freely.
 2. `scripts/check`. Don't ship a red check. If it fails, report the failures and stop.
