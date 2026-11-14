@@ -171,14 +171,38 @@ cmd_setup() {
 	echo "    start with: make server-start  and  make ui-start"
 }
 
+# deps: pnpm install, then Go and UI code generation side by side. -trimpath keeps worktree
+# paths out of Go's build cache keys, so a new worktree reuses what earlier ones compiled
+# (gqlgen type-checks the whole module: ~5 s warm instead of ~35-80 s cold). It doesn't
+# change the generated code.
 cmd_deps() {
-	local wt
+	local wt ui_pid
 	wt="$(resolve "${1:-}")"
 	info "Installing UI dependencies"
 	make -C "$wt" pre-ui
 	info "Generating code"
-	make -C "$wt" generate
+	make -C "$wt" generate-ui >/dev/null &
+	ui_pid=$!
+	GOFLAGS="${GOFLAGS:+$GOFLAGS }-trimpath" make -C "$wt" generate-backend
+	wait "$ui_pid" || die "UI code generation failed: make generate-ui"
 	info "Ready"
+}
+
+# init: what a new worktree needs, the library copy and the deps at the same time
+cmd_init() {
+	local wt log setup_pid
+	wt="$(resolve "${1:-}")"
+	log="$(mktemp)"
+	cmd_setup "$wt" >"$log" 2>&1 &
+	setup_pid=$!
+	cmd_deps "$wt"
+	if ! wait "$setup_pid"; then
+		cat "$log" >&2
+		rm -f "$log"
+		die "setup failed"
+	fi
+	cat "$log"
+	rm -f "$log"
 }
 
 cmd_refresh() {
@@ -214,16 +238,16 @@ usage() {
 	cat <<EOF
 Per-worktree dev environments. Worktrunk runs these for you:
 
-  wt switch -c <branch>        new worktree; runs setup, then deps in the background
-                               (progress: wt config state logs)
+  wt switch -c <branch>        new worktree; runs init (setup and deps at once, ~10 s)
   wt remove                    refuses while that worktree's server or dev UI is running
 
 Then, in the worktree:  make server-start   and   make ui-start
 
   scripts/worktree ls          every checkout, its ports, and whether it's running
   scripts/worktree refresh     re-copy the dev library, discarding this worktree's changes
-  scripts/worktree setup       ports + library copy (what the pre-start hook runs)
-  scripts/worktree deps        pnpm install + make generate (what the post-start hook runs)
+  scripts/worktree init        setup and deps side by side (what the pre-start hook runs)
+  scripts/worktree setup       ports + library copy
+  scripts/worktree deps        pnpm install + make generate
 
 Commands act on the worktree containing the current directory, or on a path given after
 them. Libraries are copied from $SOURCE_DATA (override with STASH_WORKTREE_SOURCE).
@@ -233,7 +257,7 @@ EOF
 command=${1:-help}
 shift || true
 case "$command" in
-setup | deps | refresh | ls) "cmd_$command" "$@" ;;
+init | setup | deps | refresh | ls) "cmd_$command" "$@" ;;
 check-stopped) cmd_check_stopped "$@" ;;
 help | -h | --help) usage ;;
 *) die "unknown command '$command' (run with no arguments for help)" ;;

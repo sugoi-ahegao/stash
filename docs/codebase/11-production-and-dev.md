@@ -221,14 +221,13 @@ branches start from the fork, not upstream's `develop`.
 `wt switch -c` starts nothing. What runs when:
 
 ```
-  pre-start   (blocks, ~5 s)   scripts/worktree setup
-                                 picks the highest free port pair below the main checkout's
-                                 copies the dev library into <worktree>/.local/
+  pre-start   (blocks, ~10 s)  scripts/worktree init: these two side by side
+                               setup: picks the highest free port pair below the main checkout's,
+                                 copies the dev library into <worktree>/.local/,
                                  writes ui/v2.5/.env.development.local
-  post-start  (background)     scripts/worktree deps
-                                 pnpm install + make generate, about 2 minutes.
-                                 Progress: wt config state logs. make server-start
-                                 fails until it's done (missing generated_*.go).
+                               deps: pnpm install, then make generate-backend (with
+                                 -trimpath, so Go's build cache is shared between
+                                 worktrees) alongside make generate-ui
   pre-remove  (blocks)         scripts/worktree check-stopped
 ```
 

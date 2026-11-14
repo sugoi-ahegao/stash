@@ -2,13 +2,10 @@
 # scripts/worktree. The scripts run from the main checkout, so branches made before
 # they existed still get them.
 
-# blocking, in order: ports and .local/, then pnpm install + make generate, all
-# before wt switch returns
+# blocking: ports and .local/ alongside pnpm install + make generate, all before
+# wt switch returns
 [[pre-start]]
-setup = "{{ primary_worktree_path }}/scripts/worktree setup {{ worktree_path }}"
-
-[[pre-start]]
-deps = "{{ primary_worktree_path }}/scripts/worktree deps {{ worktree_path }}"
+init = "{{ primary_worktree_path }}/scripts/worktree init {{ worktree_path }}"
 
 [pre-remove]
 stopped = "{{ primary_worktree_path }}/scripts/worktree check-stopped {{ worktree_path }}"
