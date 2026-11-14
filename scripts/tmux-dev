@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# One tmux session per checkout, with everything needed to work in it:
+#
+#   server      scripts/dev server   this checkout's backend (.local/config.yml's port)
+#   ui          scripts/dev ui       Vite, talking to that backend
+#   claude      two panes: worker on the left, assistant on the right
+#                 claude --agent worker    --name worker-<worktree>
+#                 claude --agent assistant --name assistant-<worktree>
+#
+# Each window (and pane) is a shell with the command typed into it, so Ctrl-C and rerunning (after Go
+# changes, say) works, and an error stays on screen. The session is named after the
+# worktree's folder. `up` also opens VS Code on the worktree (--no-code, or TMUX_DEV_CODE=0,
+# to skip), with a .vscode/tasks.json task that attaches its terminal to the session.
+#
+# worktrunk's post-start hook (.config/wt.toml) runs `up --detach` for every new worktree.
+#
+# Usage: scripts/tmux-dev <up|down|ls> [path]   (run with no arguments for help)
+
+set -euo pipefail
+
+SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
+MAIN_CHECKOUT="$(git -C "$SCRIPTS" worktree list --porcelain | sed -n '1s/^worktree //p')"
+UI_ENV=ui/v2.5/.env.development.local
+TAG=@tmux_dev_worktree # session option holding the worktree's path, for ls
+
+die() { echo "tmux-dev: $*" >&2; exit 1; }
+info() { echo "==> $*"; }
+
+command -v tmux >/dev/null || die "tmux isn't installed"
+
+port_in_use() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+server_port() { sed -n 's/^port: *//p' "$1/.local/config.yml" 2>/dev/null; }
+ui_port() { sed -n 's/^STASH_UI_PORT=//p' "$1/$UI_ENV" 2>/dev/null | tail -n1; }
+
+# the checkout containing the current directory, or the one given
+resolve() {
+	git -C "${1:-.}" rev-parse --show-toplevel 2>/dev/null || die "${1:-.} is not in a stash checkout"
+}
+
+# tmux won't take . or : in a session name
+session_name() { basename "$1" | tr '.:' '--'; }
+
+has_session() { tmux has-session -t "=$1" 2>/dev/null; }
+
+# ports WT: this checkout's server and UI ports, refusing any that belong to production or,
+# for a worktree, to the main checkout
+ports() {
+	local wt=$1 server ui
+	server="$(server_port "$wt")"
+	ui="$(ui_port "$wt")"
+	[[ -n "$server" && -n "$ui" ]] ||
+		die "$wt has no ports yet (.local/config.yml, $UI_ENV): scripts/worktree setup $wt"
+	[[ "$server" != 9999 ]] || die "$wt's backend is configured for :9999, which is production's"
+	if [[ "$wt" != "$MAIN_CHECKOUT" ]] && [[ "$server" == 9998 || "$ui" == 3998 ]]; then
+		die "$wt is configured for the main checkout's ports (:9998/:3998)"
+	fi
+	echo "$server $ui"
+}
+
+# attach NAME: switch to it inside tmux, attach from a terminal, else say how
+attach() {
+	if [[ -n "${TMUX:-}" ]]; then
+		tmux switch-client -t "=$1"
+	elif [[ -t 0 && -t 1 ]]; then
+		tmux attach-session -t "=$1"
+	else
+		echo "    attach with: tmux attach -t $1"
+	fi
+}
+
+# vscode_task WT NAME: a folder-open task attaching VS Code's terminal to the session.
+# .vscode/ is gitignored; an existing tasks.json is merged into, never replaced.
+vscode_task() {
+	local wt=$1 name=$2 file="$1/.vscode/tasks.json" task merged
+	# quoted: VS Code runs it in the login shell, and zsh expands a bare =word to a path
+	task="$(jq -n --arg cmd "tmux attach -t '=$name' || echo 'no tmux session $name: scripts/tmux-dev up'" '{
+		label: "tmux-dev: attach",
+		type: "shell",
+		command: $cmd,
+		isBackground: true,
+		problemMatcher: [],
+		presentation: {reveal: "always", panel: "dedicated", focus: true},
+		runOptions: {runOn: "folderOpen"}
+	}')"
+	mkdir -p "$wt/.vscode"
+	if [[ ! -s "$file" ]]; then
+		jq -n --argjson task "$task" '{version: "2.0.0", tasks: [$task]}' >"$file"
+	elif merged="$(jq --argjson task "$task" \
+		'.tasks = ([(.tasks // [])[] | select(.label != $task.label)] + [$task])' "$file" 2>/dev/null)"; then
+		echo "$merged" >"$file"
+	else
+		echo "    $file isn't plain JSON (comments?); left it alone. Add a folderOpen task running: tmux attach -t =$name"
+	fi
+}
+
+# window NAME WINDOW WT COMMAND: a shell in WT with COMMAND typed into it
+window() {
+	local name=$1 window=$2 wt=$3 cmd=$4
+	if [[ "$window" == server ]]; then
+		tmux new-session -d -s "$name" -n "$window" -c "$wt"
+		tmux set-option -t "=$name:" "$TAG" "$wt"
+	else
+		tmux new-window -d -t "=$name:" -n "$window" -c "$wt"
+	fi
+	tmux send-keys -t "=$name:$window" "$cmd" Enter
+}
+
+cmd_up() {
+	local wt="" detach=false code=${TMUX_DEV_CODE:-1} name pair server ui base port
+	while (($#)); do
+		case "$1" in
+		--detach) detach=true ;;
+		--no-code) code=0 ;;
+		-*) die "unknown option '$1'" ;;
+		*) wt="$1" ;;
+		esac
+		shift
+	done
+	wt="$(resolve "$wt")"
+	[[ -d "$wt/cmd/stash" ]] || die "$wt isn't a stash checkout"
+	pair="$(ports "$wt")"
+	read -r server ui <<<"$pair"
+	name="$(session_name "$wt")"
+	base="$(basename "$wt")"
+
+	if has_session "$name"; then
+		info "Session $name already exists"
+	else
+		for port in "$server" "$ui"; do
+			port_in_use "$port" && echo "    :$port is already in use; that window will say so"
+		done
+		info "Starting tmux session $name"
+		# the windows run this script's sibling scripts/dev: it works on whichever checkout
+		# it's run in, so a branch older than scripts/dev still gets it
+		window "$name" server "$wt" "$SCRIPTS/dev server"
+		window "$name" ui "$wt" "$SCRIPTS/dev ui"
+		window "$name" claude "$wt" "claude --agent assistant --name assistant-$base"
+		# the worker in a pane to the assistant's left; focus stays on the assistant
+		tmux split-window -h -b -d -t "=$name:claude" -c "$wt"
+		tmux send-keys -t "=$name:claude.{left}" "claude --agent worker --name worker-$base" Enter
+		tmux select-window -t "=$name:claude"
+	fi
+
+	echo "    $base  server http://localhost:$server   UI http://localhost:$ui"
+
+	if [[ "$code" != 0 ]] && command -v code >/dev/null; then
+		vscode_task "$wt" "$name"
+		code "$wt" || echo "    couldn't open VS Code"
+	fi
+
+	if $detach; then
+		echo "    attach with: tmux attach -t $name"
+	else
+		attach "$name"
+	fi
+}
+
+# descendants PID: PID and every process under it
+descendants() {
+	local child
+	echo "$1"
+	for child in $(ps -o pid= --ppid "$1" 2>/dev/null); do descendants "$child"; done
+}
+
+# alive PID...: whether any of them is still running
+alive() {
+	local pid
+	for pid in "$@"; do kill -0 "$pid" 2>/dev/null && return 0; done
+	return 1
+}
+
+cmd_down() {
+	local wt name pair server ui pids port
+	wt="$(resolve "${1:-}")"
+	pair="$(ports "$wt")"
+	read -r server ui <<<"$pair"
+	name="$(session_name "$wt")"
+
+	if has_session "$name"; then
+		info "Stopping the server and UI"
+		tmux send-keys -t "=$name:server" C-c 2>/dev/null || true
+		tmux send-keys -t "=$name:ui" C-c 2>/dev/null || true
+		for _ in $(seq 20); do
+			port_in_use "$server" || port_in_use "$ui" || break
+			sleep 0.5
+		done
+		# everything the windows started (Claude outlives the hangup for a few seconds)
+		pids="$(tmux list-panes -s -t "=$name" -F '#{pane_pid}' | while read -r pid; do descendants "$pid"; done)"
+		info "Killing tmux session $name"
+		tmux kill-session -t "=$name"
+		for _ in $(seq 20); do
+			alive $pids || break
+			sleep 0.5
+		done
+		# shellcheck disable=SC2086
+		if alive $pids; then kill $pids 2>/dev/null || true; fi
+	else
+		echo "    no tmux session $name"
+	fi
+
+	# whatever still listens on this checkout's own ports (started outside tmux, or slow to stop)
+	for port in "$server" "$ui"; do
+		port_in_use "$port" || continue
+		pids="$(ss -ltnpH "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u || true)"
+		[[ -n "$pids" ]] || die ":$port is still in use and its process isn't ours to see"
+		info "Stopping what's still on :$port ($(echo $pids))"
+		kill $pids 2>/dev/null || true
+		for _ in $(seq 20); do port_in_use "$port" || break; sleep 0.5; done
+	done
+
+	for port in "$server" "$ui"; do
+		! port_in_use "$port" || die ":$port is still in use"
+	done
+	echo "    $(basename "$wt") stopped (:$server and :$ui free)"
+}
+
+cmd_ls() {
+	local name wt
+	printf '%-36s %-36s %-7s %-7s %s\n' SESSION WORKTREE SERVER UI STATUS
+	while IFS=$'\t' read -r name wt; do
+		[[ -n "$wt" ]] || continue
+		local status=down server ui
+		server="$(server_port "$wt" || true)"
+		ui="$(ui_port "$wt" || true)"
+		{ [[ -n "$server" ]] && port_in_use "$server"; } || { [[ -n "$ui" ]] && port_in_use "$ui"; } && status=up
+		printf '%-36s %-36s %-7s %-7s %s\n' "$name" "$(basename "$wt")" "$server" "$ui" "$status"
+	done < <(tmux list-sessions -F "#{session_name}	#{$TAG}" 2>/dev/null || true)
+}
+
+usage() {
+	cat <<EOF
+A tmux session per checkout: server, ui, and assistant + worker Claude sessions.
+
+  scripts/tmux-dev up [path]     create the session (or reuse it) and attach; opens VS Code
+      --detach                     don't attach; print how to
+      --no-code                    don't open VS Code (or TMUX_DEV_CODE=0)
+  scripts/tmux-dev down [path]   stop the server and UI, kill the session
+  scripts/tmux-dev ls            tmux-dev sessions, their worktrees and ports
+
+Commands act on the checkout containing the current directory, or on a path given after
+them. wt switch -c <branch> runs \`up --detach\` for the new worktree (post-start hook).
+EOF
+}
+
+command=${1:-help}
+shift || true
+case "$command" in
+up | down | ls) "cmd_$command" "$@" ;;
+help | -h | --help) usage ;;
+*) die "unknown command '$command' (run with no arguments for help)" ;;
+esac

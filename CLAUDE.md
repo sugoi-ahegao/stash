@@ -56,6 +56,8 @@ make generate            # after any schema or ui/v2.5/graphql change
 scripts/dev server       # this checkout's backend (main checkout :9998); restart after Go changes
 scripts/dev ui           # Vite UI (main checkout :3998), hot-reloads
 scripts/worktree ls      # every checkout, its ports, what's running
+scripts/tmux-dev up      # tmux session for this checkout: server, ui, assistant + worker Claude; attach
+scripts/tmux-dev down    # stop that session's server and UI and kill it. ls: every session, ports
 scripts/fork-entry       # scaffold this branch's docs/fork-changelog/ entry (before merging to main)
 scripts/changelog        # regenerate FORK_CHANGELOG.md (after committing)
 scripts/prod status      # what production runs (read-only)

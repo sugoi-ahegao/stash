@@ -9,3 +9,8 @@ init = "{{ primary_worktree_path }}/scripts/worktree init {{ worktree_path }}"
 
 [pre-remove]
 stopped = "{{ primary_worktree_path }}/scripts/worktree check-stopped {{ worktree_path }}"
+
+# background, once pre-start is done: a detached tmux session with server, ui and the
+# assistant and worker Claude sessions (scripts/tmux-dev). Attach with: scripts/tmux-dev up
+[post-start]
+tmux = "{{ primary_worktree_path }}/scripts/tmux-dev up --detach {{ worktree_path }}"

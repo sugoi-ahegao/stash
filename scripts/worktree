@@ -9,7 +9,9 @@
 #   main checkout  9998   dev UI 3998
 #   worktrees      9997, 9996, ...   dev UI 3997, 3996, ...   highest free pair below
 #
-# Nothing is started. Run `make server-start` and `make ui-start` in the worktree.
+# Nothing is started here. worktrunk's post-start hook starts a detached tmux session with
+# the server, UI and Claude sessions (scripts/tmux-dev); or run `make server-start` and
+# `make ui-start` in the worktree.
 #
 # What the copy shares with the main checkout:
 #   database    snapshotted with sqlite's online backup (safe while the dev server runs)
@@ -219,7 +221,7 @@ cmd_check_stopped() {
 	local wt
 	wt="$(resolve "${1:-}")"
 	if running "$wt"; then
-		die "$(basename "$wt") is still serving on :$(server_port "$wt")/:$(ui_port "$wt"); stop it before removing the worktree"
+		die "$(basename "$wt") is still serving on :$(server_port "$wt")/:$(ui_port "$wt"); stop it (scripts/tmux-dev down) before removing the worktree"
 	fi
 }
 
@@ -241,7 +243,8 @@ Per-worktree dev environments. Worktrunk runs these for you:
   wt switch -c <branch>        new worktree; runs init (setup and deps at once, ~10 s)
   wt remove                    refuses while that worktree's server or dev UI is running
 
-Then, in the worktree:  make server-start   and   make ui-start
+Then, in the worktree:  scripts/tmux-dev up   (the post-start hook already started it detached)
+                  or:  make server-start   and   make ui-start
 
   scripts/worktree ls          every checkout, its ports, and whether it's running
   scripts/worktree refresh     re-copy the dev library, discarding this worktree's changes

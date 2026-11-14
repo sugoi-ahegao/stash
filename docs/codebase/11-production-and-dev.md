@@ -205,8 +205,12 @@ worktree gets its own copy of the **dev** library and its own ports. The hooks i
 `.config/wt.toml` call `scripts/worktree`.
 
 ```bash
-wt sw -c idea/x            # (wt switch --create) branch from main-sugoi-ahegao, set up, cd in
-make server-start          # backend on this worktree's port
+wt sw -c idea/x            # (wt switch --create) branch from main-sugoi-ahegao, set up, cd in,
+                           # and start its tmux session in the background
+scripts/tmux-dev up        # attach to it (or create it): server, ui and claude windows (worker | assistant panes)
+scripts/tmux-dev down      # stop the server and UI and kill the session
+scripts/tmux-dev ls        # tmux-dev sessions, their worktrees and ports
+make server-start          # or by hand: backend on this worktree's port
 make ui-start              # vite on this worktree's UI port, talking to that backend
 scripts/worktree ls        # every checkout, its ports, up/down
 scripts/worktree refresh   # re-copy the dev library, discarding this worktree's changes
@@ -218,7 +222,7 @@ wt rm idea/x               # (wt remove) refuses while its server or dev UI is r
 branch is set to `main-sugoi-ahegao` (`wt config state default-branch set`), so new
 branches start from the fork, not upstream's `develop`.
 
-`wt switch -c` starts nothing. What runs when:
+What runs when:
 
 ```
   pre-start   (blocks, ~10 s)  scripts/worktree init: these two side by side
@@ -228,6 +232,11 @@ branches start from the fork, not upstream's `develop`.
                                deps: pnpm install, then make generate-backend (with
                                  -trimpath, so Go's build cache is shared between
                                  worktrees) alongside make generate-ui
+  post-start  (background)     scripts/tmux-dev up --detach: a tmux session named after the
+                               folder, with windows server (scripts/dev server), ui
+                               (scripts/dev ui) and claude: worker and assistant panes side
+                               by side (claude --agent <a> --name <a>@<folder>). Output goes to worktrunk's hook log
+                               (wt config state logs); it can't attach from there.
   pre-remove  (blocks)         scripts/worktree check-stopped
 ```
 
@@ -244,6 +253,16 @@ no other worktree's config claims it and nothing is listening on it. Ports come 
 pool when their worktree is removed. The server port is `port:` in `.local/config.yml`.
 The UI port is `STASH_UI_PORT` in `.env.development.local`, which `vite.config.js` reads
 (`strictPort`, so a taken port fails loudly instead of drifting to the next one).
+
+`scripts/tmux-dev up` works in any checkout, the main one included (its ports, 9998/3998), and
+refuses a worktree configured for production's or the main checkout's ports. It also runs
+`code <worktree>` when `code` is on the PATH (`--no-code` or `TMUX_DEV_CODE=0` to skip), after
+adding a `tmux-dev: attach` task to `.vscode/tasks.json` (gitignored; merged into, never
+replaced) that runs on folder open, so VS Code's terminal attaches to the session. VS Code asks
+once before running automatic tasks (`task.allowAutomaticTasks`). Each window is a shell with
+the command typed in, so Ctrl-C and rerun works. `down` stops the server and UI with Ctrl-C,
+kills the session, waits for everything its windows started, and kills whatever is still on
+the checkout's two ports.
 
 Every checkout lives in `~/projects/stash.worktrees/`: the main checkout is `stash/`, and
 each worktree sits beside it, named after its branch (`/` becomes `-`). That's
@@ -316,6 +335,7 @@ NordVPN's "Invisibility on LAN".
 | Refresh dev from production | `scripts/prod pull-data` |
 | Start / stop production | Stash shortcut or tray icon, or `scripts/prod start` / `stop` |
 | Production log | `scripts/prod logs` |
-| Try a branch | `wt sw -c <branch>`, then `make server-start` + `make ui-start` |
+| Try a branch | `wt sw -c <branch>`, then `scripts/tmux-dev up` to attach |
+| Stop a worktree's servers and Claude sessions | `scripts/tmux-dev down` |
 | List / remove worktrees | `scripts/worktree ls` (ports) or `wt ls` / `wt rm <branch>` |
 | Merge upstream stash | `scripts/upstream-sync start`, then `finish` in its worktree (doc 12) |
