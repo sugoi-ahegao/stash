@@ -18,6 +18,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - feat(scripts): a changelog entry per merge into main, and a hook that renumbers clashing decisions `6ee68a5b2`
 - tune(scripts): new worktrees ready in ~8 s instead of ~45 s `2e2dc0523`
 - refactor(scripts): drop automatic re-dating of changelog entries at merge `59aa015e9`
+- docs: correct the unlock window, relative dates, results count width and v0.32.0 entry `c095f6415`
 - docs(fork-changelog): backfill entries for past merges into main `d724579eb` ([details](docs/fork-changelog/2026-08-28-feat-ui-landing-featured-carousel.md))
 
 ## 2026-11-08
