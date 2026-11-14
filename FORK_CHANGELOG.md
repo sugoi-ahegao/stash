@@ -12,6 +12,10 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-14
+
+- feat(scripts): tmux-dev, a tmux session per checkout with server, UI and Claude `8680ecf85` ([details](docs/fork-changelog/2026-11-14-chore-tmux-dev.md))
+
 ## 2026-11-13
 
 - feat(scripts): date changelog entries at merge, and link entries written after their merge `d483e9a3b` ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
