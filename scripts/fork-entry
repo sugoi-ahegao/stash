@@ -11,14 +11,13 @@
 # Upstream's in-app changelog (ui/v2.5/src/docs/en/Changelog/) is a different thing and is
 # never touched. See docs/fork-changelog/README.md.
 #
-# The entry is dated twice, in its name and its "**Merged:**" line. Scaffolding uses the
-# day it's written; when the squash is committed on main, the pre-commit hook runs
-# --stamp-staged, which moves both to the day of the merge.
+# The entry is dated twice, in its name and its "**Merged:**" line, both with the day it's
+# scaffolded. Write it on the day of the merge; if the merge slips to another day, fix both
+# by hand (the merge-to-main skill says so). Nothing renames entries automatically.
 #
-# Usage: scripts/fork-entry                 scaffold this branch's entry (never overwrites)
-#        scripts/fork-entry --path          print this branch's entry path, if there is one
-#        scripts/fork-entry --check         exit 1 unless the entry exists with no TODO left
-#        scripts/fork-entry --stamp-staged  date the entries being committed with today
+# Usage: scripts/fork-entry           scaffold this branch's entry (never overwrites)
+#        scripts/fork-entry --path    print this branch's entry path, if there is one
+#        scripts/fork-entry --check   exit 1 unless the entry exists with no TODO left
 
 set -euo pipefail
 
@@ -31,29 +30,6 @@ UPDATE_SUBJECT="chore(changelog): update FORK_CHANGELOG.md"
 
 die() { echo "fork-entry: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
-
-# the squash commit on main: give each entry it adds today's date (run by the pre-commit hook)
-stamp_staged() {
-	local today path base new_path
-	today="$(date +%F)"
-	while read -r path; do
-		base="$(basename "$path")"
-		[[ "$base" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-(.+\.md)$ ]] || continue
-		new_path="$DIR/$today-${BASH_REMATCH[1]}"
-		if [[ -n "$(git diff --name-only -- "$path")" ]]; then
-			die "can't date $path: it has unstaged changes. Stage them, then commit again"
-		fi
-		[[ "$new_path" == "$path" ]] || git mv "$path" "$new_path"
-		sed -i -E "s/^\*\*Merged:\*\* [0-9]{4}-[0-9]{2}-[0-9]{2}/**Merged:** $today/" "$new_path"
-		git add "$new_path"
-		[[ "$new_path" == "$path" ]] || info "dated the merge: $path -> $new_path"
-	done < <(git diff --cached --name-only --diff-filter=A -- "$DIR/")
-}
-
-if [[ "${1:-}" == --stamp-staged ]]; then
-	stamp_staged
-	exit 0
-fi
 
 branch="$(git symbolic-ref --short -q HEAD)" || die "not on a branch"
 [[ "$branch" != "$MAIN" ]] || die "on $MAIN; write the entry on the branch being merged"

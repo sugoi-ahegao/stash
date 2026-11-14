@@ -2,9 +2,11 @@
 
 One file per branch merged into `main-sugoi-ahegao`, named `YYYY-MM-DD-<branch>.md`
 (`2026-11-13-feat-ui-enhancements.md`) after the day it was merged, which its
-`**Merged:**` line repeats. Both are set by the pre-commit hook when the squash is committed,
-so an entry written days earlier still carries the merge date. Each says what the branch changed, how it works,
-what was tried and dropped along the way, and what to watch for.
+`**Merged:**` line repeats. `scripts/fork-entry` uses the day it scaffolds; whoever merges
+corrects both if the merge falls on another day. An entry written after its merge names
+the merge commit in that line (`` as `44767c45f` ``) so `scripts/changelog` can link it.
+Each says what the branch changed, how it works, what was tried and dropped along the way,
+and what to watch for.
 
 [`FORK_CHANGELOG.md`](../../FORK_CHANGELOG.md) is the index: one line per commit, generated
 from commit subjects, with a link to the entry a commit adds. These files are the detail

@@ -5,8 +5,6 @@
 #   decision numbers   two docs/decisions/ files with one number (after merging branches
 #                      that each wrote an 0008): the newer one takes the next free number,
 #                      with its links and README row, and is restaged into this commit.
-#   entry date         a squash merge into main (git merge --squash, then commit): the
-#                      docs/fork-changelog/ entry it adds takes today's date, the merge's.
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -14,8 +12,4 @@ cd "$(git rev-parse --show-toplevel)"
 # only when a decision is part of this commit
 if git diff --cached --name-only --diff-filter=ACR -- docs/decisions/ | grep -qE '/[0-9]{4}-'; then
 	scripts/decision-numbers --fix-staged
-fi
-
-if [[ -f "$(git rev-parse --git-dir)/SQUASH_MSG" && "$(git symbolic-ref --short -q HEAD)" == main-sugoi-ahegao ]]; then
-	scripts/fork-entry --stamp-staged
 fi

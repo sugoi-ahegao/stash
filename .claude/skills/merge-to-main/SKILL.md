@@ -48,8 +48,10 @@ scripts/changelog
 git commit -m "chore(changelog): update FORK_CHANGELOG.md" FORK_CHANGELOG.md
 ```
 
-The pre-commit hook dates the entry with the merge day (its name and `**Merged:**`
-line), since it was scaffolded earlier on the branch.
+The entry must carry the merge day, in its file name and its `**Merged:**` line. It's
+scaffolded with the day it's written, so write it the day you merge. If it was written on
+an earlier day, rename the file and fix the line on the branch before squashing. Nothing
+does this automatically.
 
 Decision numbers: branches number theirs independently, so a branch's `0008` may clash
 with main's. The pre-commit hook (`scripts/git-hooks/pre-commit`) renumbers the newcomer
