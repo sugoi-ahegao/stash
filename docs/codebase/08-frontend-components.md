@@ -74,7 +74,7 @@ plain `Helmet` in a suspended render leaks its title onto later pages.
   │   │   ├ SortBySelect                                                  │   │
   │   │   ├ ListOperationButtons (edit/delete/export/generate/identify/…) │   │
   │   │   ├ DisplayOptions* (mode, zoom, thumbnails, page size)           │   │
-  │   │   └ (beside it) results count* (scenes, md up; else under pager)  │   │
+  │   │   └ (beside it) results count* (scenes ≥1900px; else under pager) │   │
   │   │ FilterChips*   + Filter, Clear, a chip per filter in use: quick   │   │
   │   │                ones a Sidebar*Filter in a popover, the rest       │   │
   │   │                → EditFilterDialog                                 │   │

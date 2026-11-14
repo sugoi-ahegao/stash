@@ -204,7 +204,7 @@ Three rules decide the slide list, and only one of them touches the database:
 | rule | constant | effect | touches the DB? |
 |---|---|---|---|
 | locked-slide budget | `MAX_UNLOCKS_PER_DAY` = 3 | at most *n* **locked** slides, *n* = unlocks left today | no |
-| `isUnlockExpired` | `UNLOCKED_VISIBLE_DAYS` = 3 | unlocked slide stops taking a slot | no |
+| `isUnlockExpired` | `UNLOCKED_VISIBLE_DAYS` = 2 | unlocked slide stops taking a slot | no |
 | `staleUnratedRule` | `UNRATED_EXPIRY_DAYS` = 7 | scene leaves the featured group | yes |
 
 **A slide you can't open isn't shown.** The carousel carries only as many locked slides
@@ -213,7 +213,7 @@ the carousel rather than filling it with frosted teases. Already-unlocked slides
 unaffected — they stay for their `UNLOCKED_VISIBLE_DAYS` window.
 
 That makes the steady-state size roughly
-`MAX_UNLOCKS_PER_DAY × UNLOCKED_VISIBLE_DAYS` unlocked slides (9, by default) plus
+`MAX_UNLOCKS_PER_DAY × UNLOCKED_VISIBLE_DAYS` unlocked slides (6, by default) plus
 whatever is left of today's budget, capped by `FEATURED_COUNT`. With the budget spent and
 nothing unlocked recently, the carousel is empty and `/landing` renders only the scene
 list below it.
@@ -223,8 +223,8 @@ styling — is now **unreachable in practice**, because a slide you can't unlock
 rendered at all. The prop and CSS are kept as a safety net for the case where the budget
 count and the visible list briefly disagree.
 
-A slide you unlocked more than **3 days** ago disappears from the carousel but stays in
-the group, so a rating arriving on day 4 still lands on a featured scene and still trips
+A slide you unlocked more than **2 days** ago disappears from the carousel but stays in
+the group, so a rating arriving on day 3 still lands on a featured scene and still trips
 `ratedRule`. Only at **7 days** unrated does it actually get dropped.
 
 The visible list is built by walking the sorted group and filling `FEATURED_COUNT` slots
@@ -606,11 +606,10 @@ Lets you type `today - 30 days` into any timestamp filter instead of an absolute
   List/Filters/TimestampFilter.tsx placeholder hints show the syntax
 ```
 
-⚠️ **The expression is resolved to a concrete timestamp at entry time, not stored as an
-expression.** So a saved filter for `today - 30 days` freezes to the date it was created —
-it does not stay relative. Making it stay relative would mean persisting the expression in
-the criterion value and resolving it at query time, which is a meaningfully larger change
-(it touches the URL/saved-filter round-trip described in doc 05).
+**The expression is stored as written and resolved each time the query is built**
+(`TimestampCriterion.transformValueToInput` calls `TextUtils.resolveRelativeDate`), so a
+saved filter for `today - 30 days` stays relative: it means 30 days before today, whenever
+it runs. `today` is midnight, not the current time.
 
 ⚠️ The hint string in `TimestampFilter.tsx` is a hardcoded English literal, not an i18n
 message. It should move to `locales/en-GB.json` before this goes anywhere near upstream.

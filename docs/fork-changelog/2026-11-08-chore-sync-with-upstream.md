@@ -53,14 +53,6 @@ exist yet._
 
 ## Watch out
 
-- **Upstream's security tripwire is gone** (#7085). With no credentials configured,
-  requests from public IPs now get a 403 instead of shutting stash down. The config
-  fields `dangerous_allow_public_without_auth` and
-  `security_tripwire_accessed_from_public_internet` were removed; `public_whitelist` and
-  `trusted_proxies` are new. Local and private-network (LAN) addresses aren't affected;
-  check production's config if it's ever reached from a public address.
-- **Marker previews** follow each marker's end time now. The old 20-second cap is the
-  optional "Max marker preview duration" setting (#6855).
 - **UI plugins** that rely on React internals may break under React 18.
 - **No new database migrations**, upstream's or the fork's.
 - The version check needs upstream's `v*` tags in the main checkout. A checkout without
