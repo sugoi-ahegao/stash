@@ -16,6 +16,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 - feat(scripts): date changelog entries at merge, and link entries written after their merge `d483e9a3b` ([details](docs/fork-changelog/2026-11-08-chore-sync-with-upstream.md))
 - feat(scripts): a changelog entry per merge into main, and a hook that renumbers clashing decisions `6ee68a5b2`
+- refactor(scripts): drop automatic re-dating of changelog entries at merge `59aa015e9`
 
 ## 2026-11-08
 
