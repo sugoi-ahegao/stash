@@ -50,7 +50,10 @@ Each top-level route delegates to a small router. `components/Scenes/Scenes.tsx`
    /scenes/:id         → Scene            (detail page)
 ```
 
-All lazy-loaded. `useTitleProps` + `<Helmet>` set the document title at this level.
+All lazy-loaded. `useTitleProps` + `<Helmet>` set the document title at this level. A
+component that renders lazy children next to its title uses the fork's `CommittedHelmet`
+(`components/Shared/CommittedHelmet.tsx`) instead, as the scene page does: under React 18 a
+plain `Helmet` in a suspended render leaks its title onto later pages.
 
 ### Archetype B — the list page
 

@@ -22,6 +22,8 @@
 #
 # A commit that adds an entry in docs/fork-changelog/ (a branch's squash merge, written with
 # scripts/fork-entry) gets a link to it: the subject is the index, the entry the detail.
+# An entry written after its merge names the merge commit in its "**Merged:**" line
+# ("... as `44767c45f`"), and that commit gets the link instead.
 #
 # Commits with exactly that last subject are left out, so updating the changelog doesn't
 # add an entry of its own. Updating once per batch of work (before a ship, after an upstream
@@ -55,27 +57,44 @@ rank() {
 	echo 99
 }
 
+# full hash -> entry, for entries written after their merge ("**Merged:** ... as `abc123`")
+declare -A LATE_ENTRIES=()
+late_entries() {
+	local path hash
+	for path in "$ENTRIES"/[0-9][0-9][0-9][0-9]-*.md; do
+		[[ -f "$path" ]] || continue
+		hash="$(sed -nE 's/^\*\*Merged:\*\*.* as `([0-9a-f]{7,40})`.*/\1/p' "$path" | head -1)"
+		[[ -n "$hash" ]] || continue
+		hash="$(git rev-parse -q --verify "$hash^{commit}" 2>/dev/null)" || continue
+		LATE_ENTRIES[$hash]="$path"
+	done
+}
+
 # one line per entry: date <tab> rank <tab> markdown
 entries() {
 	local hash date subject type merged count entry
+	late_entries
 	while IFS=$'\t' read -r hash date subject; do
 		[[ "$subject" =~ ^([a-z]+)[a-z,\ ]*(\([^\)]*\))?!?:\  ]] || continue
 		type="${BASH_REMATCH[1]}"
 		[[ "$subject" == "$UPDATE_SUBJECT" ]] && continue # this script's own output
 		entry="$(git diff-tree --no-commit-id --name-only --diff-filter=A -r "$hash" -- "$ENTRIES/" |
 			grep -E "^$ENTRIES/[0-9]{4}-[0-9]{2}-[0-9]{2}-.*\.md$" | head -1 || true)"
+		[[ -n "$entry" ]] || entry="${LATE_ENTRIES[$(git rev-parse "$hash")]:-}"
 		printf '%s\t%s\t- %s `%s`%s\n' "$date" "$(rank "$type")" "$subject" "$hash" \
 			"${entry:+ ([details]($entry))}"
 	done < <(git log --no-merges --format='%h%x09%ad%x09%s' --date=short "$UPSTREAM_REF..HEAD")
 
+	# an upstream sync is a merge whose second parent is upstream's, whatever its subject
 	while IFS=$'\t' read -r hash date subject; do
 		git rev-parse -q --verify "$hash^2" >/dev/null || continue
+		git merge-base --is-ancestor "$hash^2" "$UPSTREAM_REF" || continue
 		merged="$(git rev-parse --short=8 "$hash^2")"
 		count="$(git rev-list --count "$hash^1..$hash^2")"
-		printf '%s\t%s\t- **upstream sync**: merged stashapp/stash `develop` at `%s` (%s upstream commits) `%s`. What they changed is in upstream'"'"'s changelog, not here\n' \
-			"$date" -1 "$merged" "$count" "$hash"
-	done < <(git log --merges --first-parent --format='%h%x09%ad%x09%s' --date=short "$UPSTREAM_REF..HEAD" |
-		grep -F "$UPSTREAM_REF" || true)
+		entry="${LATE_ENTRIES[$(git rev-parse "$hash")]:-}"
+		printf '%s\t%s\t- **upstream sync**: merged stashapp/stash `develop` at `%s` (%s upstream commits) `%s`. What they changed is in upstream'"'"'s changelog, not here%s\n' \
+			"$date" -1 "$merged" "$count" "$hash" "${entry:+ ([details]($entry))}"
+	done < <(git log --merges --first-parent --format='%h%x09%ad%x09%s' --date=short "$UPSTREAM_REF..HEAD")
 }
 
 render() {

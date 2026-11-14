@@ -164,6 +164,7 @@ the single write connection and blocks the entire application (doc 04).
 | A community plugin breaks after your refactor | | you renamed or removed a `PatchComponent` name — that's a public API |
 | Config key doesn't round-trip | | double capitals in an `IUIConfig` key (`showURLs` → use `showUrls`) |
 | Dev server can't log in | 401s on `make ui-start` | cross-origin cookies; disable auth on the dev server |
+| A page's title shows on every later page | tab title stuck after navigating | a `<Helmet>` next to lazy children: React 18 drops the suspended render without unmounting it. Use `CommittedHelmet` |
 
 ## Validation before you push
 

@@ -1,7 +1,9 @@
 # Fork changelog entries
 
 One file per branch merged into `main-sugoi-ahegao`, named `YYYY-MM-DD-<branch>.md`
-(`2026-11-13-feat-ui-enhancements.md`). Each says what the branch changed, how it works,
+(`2026-11-13-feat-ui-enhancements.md`) after the day it was merged, which its
+`**Merged:**` line repeats. Both are set by the pre-commit hook when the squash is committed,
+so an entry written days earlier still carries the merge date. Each says what the branch changed, how it works,
 what was tried and dropped along the way, and what to watch for.
 
 [`FORK_CHANGELOG.md`](../../FORK_CHANGELOG.md) is the index: one line per commit, generated
