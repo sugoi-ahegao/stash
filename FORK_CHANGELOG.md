@@ -7,8 +7,14 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
   [`ui/v2.5/src/docs/en/Changelog/`](ui/v2.5/src/docs/en/Changelog/), which the app shows.
   Never add fork entries there.
 - Last upstream commit merged: `v0.32.0-8-gaefc9373f` (2026-11-07).
+- Each branch merged into main has an entry in [`docs/fork-changelog/`](docs/fork-changelog/):
+  what it changed, how, and what was tried and dropped. Lines link to theirs.
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
+
+## 2026-11-13
+
+- feat(scripts): a changelog entry per merge into main, and a hook that renumbers clashing decisions `6ee68a5b2`
 
 ## 2026-11-08
 
