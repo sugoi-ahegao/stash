@@ -12,11 +12,13 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-15
+
+- tune(ui): pb theme nav shows the active link as glowing red text, and is named "PB Theme" `e050a5c46` ([details](docs/fork-changelog/2026-11-15-feat-ui-tweaks.md))
+
 ## 2026-11-14
 
 - feat(scripts): tmux-dev, a tmux session per checkout with server, UI and Claude `8680ecf85` ([details](docs/fork-changelog/2026-11-14-chore-tmux-dev.md))
-- tune(ui): name the pb theme "PB Theme" `f9d1881af`
-- tune(ui): pb nav shows the active link as glowing red text, no red flash on click `014ee7d0f`
 
 ## 2026-11-13
 
