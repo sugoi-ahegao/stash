@@ -471,6 +471,45 @@ buttons are 3rem pills beside it, a group joined into one with a line between it
 - On the scene list the row keeps room for the results count beside it (below). On a
   phone the bar gets a row of its own, first.
 
+**Suggestions (scene list only).** `ToolbarSearch` takes `suggestions`, passed through
+`FilteredListToolbar`'s `searchSuggestions`; only `SceneList.tsx` sets it. While the field
+is focused with 2+ characters, a dropdown under the pill lists matching studios,
+performers and tags (`List/ToolbarSearchSuggestions.tsx`). It's UI-only: one query,
+`FindSearchSuggestions` (`ui/v2.5/graphql/queries/search-suggestions.graphql`), runs
+`findStudios`/`findPerformers`/`findTags` with `q`, 100ms after the last keystroke
+(the server answers in ~50ms; Apollo shows only the latest term's answer, and the last
+list stays up while the next loads).
+
+- Each kind is fetched in tiers (name regex: exact, prefix, word start; then `q`, which
+  takes aliases too), busiest first within a tier, and shows the first 5, zero-scene ones
+  included. Studio counts and picks take in sub-studios (depth -1). Empty groups are skipped; no matches, no dropdown.
+- A row shows the image (an icon when it's the default), the name with the term marked,
+  and the scene count.
+- Clicking a row (`filterBySuggestion`) starts a fresh filter of just that item: every
+  other criterion (defaults too) and the term go; sort, page size, display and zoom stay.
+  Its **+** (`addSuggestionToFilter`) adds it to the current filter instead: appended to
+  the existing studios / performers / tags criterion, or a new one with the default
+  modifier (studios: includes); one on "is null"/"not null" starts over. Either way the
+  Its **−** (also `addSuggestionToFilter`) adds it as an exclusion: to the criterion's
+  excluded items (moved there if it was included), the rest of the filter untouched; an
+  "equals" criterion becomes "includes all" (only includes / includes all take
+  exclusions). Each way the
+  term is cleared; focus stays in the field, except on a touch screen or at phone width,
+  where it leaves so the keyboard closes. A term with `%`, `_` or a `-word` skips the `q`
+  tier (it can't escape LIKE wildcards) and uses the literal name tiers alone.
+- Typing still drives the text search. **↓/↑** move through the rows (↓ also reopens a
+  dismissed list); **Enter** picks the highlighted row (**Shift+Enter** adds it, **Alt+Enter** excludes
+  it), or searches as before with none;
+  **Escape** closes the list first, then clears, then leaves.
+- The term reaches the scene list (500ms after the last key, as upstream) inside
+  `startTransition`: re-rendering the list blocked the main thread for 1–1.5s in the dev
+  build (long tasks up to ~240ms), so keys and the suggestions waited on it. A transition
+  yields to typing (~0.3–0.5s, tasks under ~120ms); since it can commit
+  after more is typed, `ToolbarSearch` skips syncing the field from a term it sent itself
+  (`sentTerm`).
+- The pill clips its contents (`overflow: hidden`) except while the list is open
+  (`.suggestions-open`), since the list is positioned inside it.
+
 ### Play in the ··· menu
 
 The scene list's toolbar has no ▶ button: `SceneList.tsx` doesn't pass `onPlay` to

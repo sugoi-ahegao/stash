@@ -1,0 +1,159 @@
+# fork: the scene list's search suggestions (List/ToolbarSearchSuggestions.tsx):
+# studios, performers and tags matching the typed term, in one request. Each
+# kind is fetched in tiers (exact name, name starts with the term, a word
+# does, then anything `q` finds, aliases too), the busiest first, so a quiet
+# exact match isn't crowded out by busier loose ones.
+query FindSearchSuggestions(
+  $any: FindFilterType!
+  $tier: FindFilterType!
+  $exact: String!
+  $prefix: String!
+  $word: String!
+  $parents: FindFilterType!
+  $anyParents: FindFilterType!
+  # off when the term would mean something else to `q` (LIKE wildcards, -word)
+  $withQ: Boolean!
+) {
+  studios_exact: findStudios(
+    filter: $tier
+    studio_filter: { name: { value: $exact, modifier: MATCHES_REGEX } }
+  ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  studios_prefix: findStudios(
+    filter: $tier
+    studio_filter: { name: { value: $prefix, modifier: MATCHES_REGEX } }
+  ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  studios_word: findStudios(
+    filter: $tier
+    studio_filter: { name: { value: $word, modifier: MATCHES_REGEX } }
+  ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  studios_any: findStudios(filter: $any) @include(if: $withQ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  # networks: sorted by their own scenes they'd fall behind, so fetched apart
+  studios_prefix_parents: findStudios(
+    filter: $parents
+    studio_filter: {
+      name: { value: $prefix, modifier: MATCHES_REGEX }
+      child_count: { value: 0, modifier: GREATER_THAN }
+    }
+  ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  # networks: sorted by their own scenes they'd fall behind, so fetched apart
+  studios_word_parents: findStudios(
+    filter: $parents
+    studio_filter: {
+      name: { value: $word, modifier: MATCHES_REGEX }
+      child_count: { value: 0, modifier: GREATER_THAN }
+    }
+  ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  studios_any_parents: findStudios(
+    filter: $anyParents
+    studio_filter: { child_count: { value: 0, modifier: GREATER_THAN } }
+  ) @include(if: $withQ) {
+    studios {
+      ...SearchSuggestionStudio
+    }
+  }
+  performers_exact: findPerformers(
+    filter: $tier
+    performer_filter: { name: { value: $exact, modifier: MATCHES_REGEX } }
+  ) {
+    performers {
+      ...SearchSuggestionPerformer
+    }
+  }
+  performers_prefix: findPerformers(
+    filter: $tier
+    performer_filter: { name: { value: $prefix, modifier: MATCHES_REGEX } }
+  ) {
+    performers {
+      ...SearchSuggestionPerformer
+    }
+  }
+  performers_word: findPerformers(
+    filter: $tier
+    performer_filter: { name: { value: $word, modifier: MATCHES_REGEX } }
+  ) {
+    performers {
+      ...SearchSuggestionPerformer
+    }
+  }
+  performers_any: findPerformers(filter: $any) @include(if: $withQ) {
+    performers {
+      ...SearchSuggestionPerformer
+    }
+  }
+  tags_exact: findTags(
+    filter: $tier
+    tag_filter: { name: { value: $exact, modifier: MATCHES_REGEX } }
+  ) {
+    tags {
+      ...SearchSuggestionTag
+    }
+  }
+  tags_prefix: findTags(
+    filter: $tier
+    tag_filter: { name: { value: $prefix, modifier: MATCHES_REGEX } }
+  ) {
+    tags {
+      ...SearchSuggestionTag
+    }
+  }
+  tags_word: findTags(
+    filter: $tier
+    tag_filter: { name: { value: $word, modifier: MATCHES_REGEX } }
+  ) {
+    tags {
+      ...SearchSuggestionTag
+    }
+  }
+  tags_any: findTags(filter: $any) @include(if: $withQ) {
+    tags {
+      ...SearchSuggestionTag
+    }
+  }
+}
+
+fragment SearchSuggestionStudio on Studio {
+  id
+  name
+  image_path
+  # with its sub-studios', as a pick filters (depth -1)
+  scene_count(depth: -1)
+}
+
+fragment SearchSuggestionPerformer on Performer {
+  id
+  name
+  disambiguation
+  image_path
+  scene_count
+}
+
+fragment SearchSuggestionTag on Tag {
+  id
+  name
+  image_path
+  scene_count
+}

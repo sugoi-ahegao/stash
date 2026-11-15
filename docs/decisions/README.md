@@ -13,6 +13,7 @@ purpose. Each one is short: the problem, what was chosen, what it costs.
 | 0005 | [Production is a native Windows binary](0005-production-on-windows.md) | 2026-10-23 |
 | 0006 | [A UI-only ship still restarts production](0006-ui-ship-restarts.md) | 2026-10-24 |
 | 0007 | [The fork keeps its own changelog](0007-fork-changelog.md) | 2026-10-24 |
+| 0008 | [Search suggestions are built in the UI from tiered find* queries](0008-search-suggestions-ui-only.md) | 2026-11-15 |
 
 ## Adding one
 

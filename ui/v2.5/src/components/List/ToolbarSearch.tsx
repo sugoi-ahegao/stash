@@ -1,6 +1,12 @@
 // fork: the list toolbar's search bar, the row's centrepiece. Upstream's
 // SearchTermInput (ListFilter.tsx) stays as it is for the sidebar.
-import React, { useEffect, useState } from "react";
+import React, {
+  startTransition,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import Mousetrap from "mousetrap";
 import { useIntl } from "react-intl";
 import cx from "classnames";
@@ -10,6 +16,18 @@ import { FilterMode } from "src/core/generated-graphql";
 import useFocus from "src/utils/focus";
 import { Icon } from "../Shared/Icon";
 import { useDebouncedSearchInput } from "./ListFilter";
+import {
+  addSuggestionToFilter,
+  filterBySuggestion,
+  ISuggestion,
+  SuggestionAction,
+  ToolbarSearchSuggestions,
+  useSearchSuggestions,
+} from "./ToolbarSearchSuggestions"; // fork
+
+// as toolbar-search.scss sizes the suggestions' + for a finger: a touch
+// screen, or phone width (Bootstrap's xs)
+const touchOrPhone = "(pointer: coarse), (max-width: 575.98px)";
 
 // the countables message naming what a list holds, for the placeholder
 const countableID: Partial<Record<FilterMode, string>> = {
@@ -27,20 +45,55 @@ const countableID: Partial<Record<FilterMode, string>> = {
 export const ToolbarSearch: React.FC<{
   filter: ListFilterModel;
   onFilterUpdate: (newFilter: ListFilterModel) => void;
-}> = ({ filter, onFilterUpdate }) => {
+  // studios, performers and tags matching the term, under the bar
+  suggestions?: boolean;
+}> = ({ filter, onFilterUpdate, suggestions = false }) => {
   const intl = useIntl();
   const [value, setValue] = useState(filter.searchTerm);
   const [focused, setFocused] = useState(false);
   const [inputRef, setInputFocus] = useFocus();
+  const listID = useId();
+
+  // the suggestions: open while focused with matches, until Escape or a pick;
+  // typing opens them again
+  const matches = useSearchSuggestions(value, suggestions && focused);
+  const [dismissed, setDismissed] = useState(false);
+  const [active, setActive] = useState(-1);
+  const open = suggestions && focused && !dismissed && matches.length > 0;
+
+  // new matches: nothing highlighted
+  const [shownMatches, setShownMatches] = useState(matches);
+  if (shownMatches !== matches) {
+    setShownMatches(matches);
+    setActive(-1);
+  }
+
+  // the term as typed goes to the list as a transition: re-rendering the
+  // list takes a few hundred ms, and typing (and the suggestions) mustn't
+  // wait on it. It can land after more is typed, so the term it carries
+  // doesn't overwrite the field.
+  const sentTerm = useRef<string>();
+  function searchUpdate(next: ListFilterModel) {
+    sentTerm.current = next.searchTerm;
+    startTransition(() => onFilterUpdate(next));
+  }
 
   // a saved filter, the URL or Clear can change the term from outside
   useEffect(() => {
+    if (
+      sentTerm.current !== undefined &&
+      filter.searchTerm === sentTerm.current
+    ) {
+      sentTerm.current = undefined;
+      return;
+    }
+    sentTerm.current = undefined;
     setValue(filter.searchTerm);
   }, [filter.searchTerm]);
 
   const { searchCallback, onClear } = useDebouncedSearchInput(
     filter,
-    onFilterUpdate
+    searchUpdate
   );
 
   // "/" from anywhere: focus, with the term selected so typing replaces it.
@@ -65,6 +118,7 @@ export const ToolbarSearch: React.FC<{
 
   function onChange(next: string) {
     setValue(next);
+    setDismissed(false);
     if (next) {
       searchCallback(next);
     } else {
@@ -72,7 +126,62 @@ export const ToolbarSearch: React.FC<{
     }
   }
 
+  // a pick shows just that item; add and exclude put it in the current filter
+  function pick(s: ISuggestion, action: SuggestionAction) {
+    searchCallback.cancel();
+    setValue("");
+    setDismissed(true);
+    onFilterUpdate(
+      action === "only"
+        ? filterBySuggestion(filter, s)
+        : addSuggestionToFilter(filter, s, action === "exclude")
+    );
+    // a phone: leave the field, so its keyboard makes way for the results.
+    // Elsewhere stay in it, ready for the next term (and keys don't fall
+    // through to the page's hotkeys).
+    if (window.matchMedia(touchOrPhone).matches) {
+      inputRef.current?.blur();
+    }
+  }
+
+  function onSuggestionKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!suggestions) return false;
+
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!open) {
+        if (e.key === "ArrowDown" && dismissed && matches.length) {
+          e.preventDefault();
+          setDismissed(false);
+          return true;
+        }
+        return false;
+      }
+      e.preventDefault();
+      const n = matches.length;
+      setActive((i) =>
+        e.key === "ArrowDown" ? (i + 1) % n : i <= 0 ? n - 1 : i - 1
+      );
+      return true;
+    }
+    if (!open) return false;
+    if (e.key === "Enter" && active >= 0 && matches[active]) {
+      e.preventDefault();
+      pick(matches[active], e.altKey ? "exclude" : e.shiftKey ? "add" : "only");
+      return true;
+    }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      setDismissed(true);
+      setActive(-1);
+      return true;
+    }
+    return false;
+  }
+
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (onSuggestionKey(e)) {
+      return;
+    }
     if (e.key === "Enter") {
       // don't wait out the debounce
       searchCallback.flush();
@@ -98,6 +207,7 @@ export const ToolbarSearch: React.FC<{
       className={cx("toolbar-search", {
         focused,
         "has-value": !!value,
+        "suggestions-open": open,
       })}
       onMouseDown={(e) => {
         // a click anywhere on the bar lands in the field
@@ -121,7 +231,18 @@ export const ToolbarSearch: React.FC<{
         onChange={(e) => onChange(e.currentTarget.value)}
         onKeyDown={onKeyDown}
         onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          setDismissed(false);
+        }}
+        {...(suggestions && {
+          role: "combobox",
+          "aria-autocomplete": "list" as const,
+          "aria-expanded": open,
+          "aria-controls": listID,
+          "aria-activedescendant":
+            open && active >= 0 ? `${listID}-${active}` : undefined,
+        })}
       />
       {value ? (
         <button
@@ -138,6 +259,16 @@ export const ToolbarSearch: React.FC<{
             /
           </kbd>
         )
+      )}
+      {open && (
+        <ToolbarSearchSuggestions
+          id={listID}
+          items={matches}
+          active={active}
+          term={value}
+          onHover={setActive}
+          onPick={pick}
+        />
       )}
     </div>
   );

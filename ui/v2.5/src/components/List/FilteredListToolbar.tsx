@@ -90,6 +90,7 @@ export interface IFilteredListToolbar {
   filterable?: boolean;
   sortable?: boolean;
   showFilterButton?: boolean; // fork: false where FilterChips stand in
+  searchSuggestions?: boolean; // fork: studios, performers, tags under the search
 }
 
 export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
@@ -108,6 +109,7 @@ export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
   filterable = true,
   sortable = true,
   showFilterButton = true, // fork
+  searchSuggestions = false, // fork
 }) => {
   const { configuration } = useConfigurationContext();
   const { pinnedSortBy = {} } = configuration.ui;
@@ -230,7 +232,11 @@ export const FilteredListToolbar: React.FC<IFilteredListToolbar> = ({
 
           {/* fork: the search bar, the row's centrepiece */}
           {filterable && (
-            <ToolbarSearch filter={filter} onFilterUpdate={setFilter} />
+            <ToolbarSearch
+              filter={filter}
+              onFilterUpdate={setFilter}
+              suggestions={searchSuggestions}
+            />
           )}
         </>
       )}

@@ -546,6 +546,7 @@ export const FilteredSceneList = PatchComponent(
               setFilter={setFilter}
               showEditFilter={showEditFilter}
               showFilterButton={false}
+              searchSuggestions // fork
               onDelete={onDelete}
               onEdit={onEdit}
               operationComponent={operations}

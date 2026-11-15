@@ -712,6 +712,22 @@ html[data-theme="pb"] {
     filter: drop-shadow(0 0 4px rgba(255, 31, 61, 0.6));
   }
 
+  .toolbar-search-suggestions {
+    background-color: $pb-raised;
+    border-color: $pb-line;
+    box-shadow:
+      0 0 0 1px rgba(255, 31, 61, 0.08),
+      0 18px 44px rgba(0, 0, 0, 0.85);
+  }
+
+  .suggestion.active {
+    background-color: rgba(255, 31, 61, 0.12);
+  }
+
+  .suggestion mark {
+    text-shadow: $pb-text-glow;
+  }
+
   .toolbar-search-key {
     background-color: $pb-bg;
     border-color: #2e2e33;
