@@ -9,7 +9,7 @@ export const defaultThemeID = "blueprint";
 
 export const themes: ITheme[] = [
   { id: defaultThemeID, name: "Blueprint" },
-  { id: "pb", name: "pb" },
+  { id: "pb", name: "PB Theme" },
 ];
 
 const storageKey = "theme";

@@ -256,18 +256,40 @@ html[data-theme="pb"] {
     color: #fff;
   }
 
-  .top-nav .btn.active:not(.disabled),
+  // the active nav link's icon and label turn red with a soft glow, no box
+  .top-nav .btn.active:not(.disabled) {
+    background-color: transparent;
+    color: $pb-red;
+    text-shadow: $pb-text-glow;
+
+    .fa-icon {
+      filter: drop-shadow(0 0 4px rgba(255, 31, 61, 0.6));
+    }
+  }
+
   .top-nav .btn.active:not(.disabled):hover {
-    background-color: $pb-red-dark;
+    background-color: rgba(255, 255, 255, 0.06);
+    color: $pb-red;
+  }
+
+  // pressing a nav button only darkens it a touch: no red fill, no glow
+  .top-nav .btn:not(:disabled):not(.disabled):active,
+  .top-nav .btn:not(:disabled):not(.disabled).active:active {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: transparent;
     color: #fff;
   }
 
-  // the focus ring glows red instead of bootstrap's blue
   .top-nav .btn:focus,
   .top-nav .btn.focus,
   .top-nav .btn:not(:disabled):not(.disabled):active:focus,
   .top-nav .btn:not(:disabled):not(.disabled).active:focus {
-    box-shadow: $pb-glow;
+    box-shadow: none;
+  }
+
+  // keyboard focus still shows a faint red ring
+  .top-nav .btn:focus-visible {
+    box-shadow: 0 0 0 2px rgba(255, 31, 61, 0.5);
   }
 
   .navbar-brand .brand-link {
