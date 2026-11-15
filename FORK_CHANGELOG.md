@@ -15,6 +15,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 ## 2026-11-15
 
 - tune(ui): pb theme nav shows the active link as glowing red text, and is named "PB Theme" `e050a5c46` ([details](docs/fork-changelog/2026-11-15-feat-ui-tweaks.md))
+- docs(claude): add Working with Pranav section to CLAUDE.md `0846fcc03`
 
 ## 2026-11-14
 
