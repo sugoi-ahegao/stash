@@ -15,6 +15,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 ## 2026-11-23
 
 - feat(ui): rename PB theme to Blackhole and make it the default `a6deaf64b`
+- tune(ui): rename Blackhole theme to PB Blackhole `0964ea506`
 
 ## 2026-11-15
 
