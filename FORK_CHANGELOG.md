@@ -12,6 +12,10 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-23
+
+- feat(ui): rename PB theme to Blackhole and make it the default `a6deaf64b`
+
 ## 2026-11-15
 
 - feat(ui): scene search suggestions for studios, performers and tags `66e79aebf` ([details](docs/fork-changelog/2026-11-15-feat-scene-search-bar-results.md))
