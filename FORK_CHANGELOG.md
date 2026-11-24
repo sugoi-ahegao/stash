@@ -14,10 +14,7 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 
 ## 2026-11-24
 
-- tune(ui): open scenes instead of the landing page `e9b22f321`
-- tune(ui): one filter pill per row on phones `01ebbdc0c`
-- tune(ui): saved filters above the search on phones `577a2d902`
-- tune(ui): one scene per row on phones `a801bb598`
+- tune(ui): phone layout: one scene per row, tidier list toolbar, / opens scenes `bd550ce9a` ([details](docs/fork-changelog/2026-11-24-feat-mobile-optimization.md))
 
 ## 2026-11-23
 
