@@ -3,13 +3,15 @@ export interface ITheme {
   name: string;
 }
 
-// The default theme is the base stylesheet; every other theme overrides it
-// from rules scoped to html[data-theme="<id>"].
-export const defaultThemeID = "blueprint";
+// Blueprint is the base stylesheet; every other theme overrides it from
+// rules scoped to html[data-theme="<id>"]. Browsers that never picked a
+// theme get defaultThemeID.
+const baseThemeID = "blueprint";
+export const defaultThemeID = "pb";
 
 export const themes: ITheme[] = [
-  { id: defaultThemeID, name: "Blueprint" },
-  { id: "pb", name: "PB Theme" },
+  { id: baseThemeID, name: "Blueprint" },
+  { id: "pb", name: "Blackhole" },
 ];
 
 const storageKey = "theme";
@@ -31,7 +33,7 @@ export function getStoredTheme(): string {
 }
 
 export function applyTheme(id: string) {
-  if (id === defaultThemeID) {
+  if (id === baseThemeID) {
     delete document.documentElement.dataset.theme;
   } else {
     document.documentElement.dataset.theme = id;
