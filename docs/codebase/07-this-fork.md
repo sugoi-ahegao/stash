@@ -67,7 +67,7 @@ upstream commits had no server-side conflicts.
        ui/v2.5/scripts/build_flame_sprite.py
   NEW  Scenes/HoldToGenerate.tsx,               hold a scene card's thumbnail 5s to
        Scenes/hold-to-generate.scss               generate, with a fresh preview
-  NEW  components/ThemeSwitcher.tsx,             theme switcher in the navbar: Blackhole
+  NEW  components/ThemeSwitcher.tsx,             theme switcher in the navbar: PB Blackhole
        utils/theme.ts, styles/themes/_pb.scss    (id pb, default) and Blueprint, per browser
   NEW  List/ThumbnailToggle.tsx                 thumbnail visibility toggle
   MOD  List/ListViewOptions.tsx,                 (Feature 2)
