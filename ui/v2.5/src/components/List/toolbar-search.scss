@@ -411,4 +411,18 @@ $toolbar-button-height: 3rem;
     max-width: none;
     order: -1;
   }
+
+  // the saved filters above it, on a row of their own, so the buttons after
+  // the search fit on one row
+  .filtered-list-toolbar > .saved-filter-dropdown {
+    display: flex;
+    flex-basis: 100%;
+    order: -2;
+
+    // its own width, not the row's, in the middle
+    > .btn {
+      flex: 0 0 auto;
+      margin: 0 auto;
+    }
+  }
 }

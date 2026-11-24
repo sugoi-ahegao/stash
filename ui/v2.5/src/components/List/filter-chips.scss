@@ -199,7 +199,27 @@
 
 @include media-breakpoint-down(xs) {
   .saved-filter-toggle.dropdown-toggle {
-    width: 9rem;
+    width: 12rem;
+  }
+
+  // Filter and Clear share the first row; each set criterion gets a row of
+  // its own, lined up with the cards' edges rather than edge to edge
+  .filter-chips {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .filter-chips > .filter-chip.set {
+    flex-basis: 100%;
+
+    .filter-chip-main {
+      flex: 1 1 auto;
+      justify-content: center;
+    }
+
+    .filter-chip-label {
+      max-width: none;
+    }
   }
 }
 

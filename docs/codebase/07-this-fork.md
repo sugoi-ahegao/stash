@@ -41,7 +41,7 @@ upstream commits had no server-side conflicts.
          ForkSettings.tsx                     Settings > Interface > This Library
   MOD  core/config.ts, SettingsInterfacePanel.tsx   their keys, and the section's call site
 
-  MOD  App.tsx, MainNavbar.tsx, List/views.ts    wire up the /landing route
+  MOD  App.tsx, MainNavbar.tsx, List/views.ts    wire up /landing; / opens /scenes
   MOD  graphql/queries/scene.graphql             2 new queries
   MOD  internal/api/resolver_mutation_scene.go   `// fork` call sites: the featured
                                                  lifecycle on every scene update path
@@ -442,10 +442,15 @@ is one row, `List/FilterChips.tsx`, with a chip only for each filter in use:
   as a chip.
 - A set chip shows `criterion.getLabel()` and an × that removes it. **Clear** removes every
   criterion (not the search term).
+- On a phone, + Filter and Clear share the first row and each set chip gets a full-width row
+  of its own, its label centred and not truncated, lined up with the cards' edges
+  (`filter-chips.scss`).
 
 ### Saved filters button
 
-On every list's toolbar the saved filters dropdown comes first, before the search box, and
+On every list's toolbar the saved filters dropdown comes first, before the search box (on a
+phone, centred on a row of its own above it, so the buttons after the search fit on one
+row: `toolbar-search.scss`), and
 its button names the saved filter being shown, or reads "Saved filters" dimmed
 (`SavedFilterDropdown`'s fork `toggleLabel`). `useActiveSavedFilter`
 (`List/activeSavedFilter.ts`) finds it: the saved filter that, loaded the way the dropdown
@@ -453,7 +458,7 @@ loads one, gives the same search, sort and criteria. The page, page size, displa
 zoom don't count. Change the search, sort or a criterion and it reads "Saved filters"
 again. The bookmark, name and chevron are spaced by a flex gap, with the global
 `.fa-icon` side margins zeroed, so the padding is even. The button is a fixed 12rem
-(9rem on a phone) whatever the name, so the row doesn't shift when it changes; a longer
+(also 12rem on a phone) whatever the name, so the row doesn't shift when it changes; a longer
 name is ellipsised.
 
 ### Search bar
@@ -469,7 +474,7 @@ buttons are 3rem pills beside it, a group joined into one with a line between it
   out the 500ms debounce; **Escape** clears the term, and a second press leaves the field.
 - Focused, its border and icon take the accent, with a ring (pb: red, with a glow).
 - On the scene list the row keeps room for the results count beside it (below). On a
-  phone the bar gets a row of its own, first.
+  phone the bar gets a row of its own, under the saved filters' row.
 
 **Suggestions (scene list only).** `ToolbarSearch` takes `suggestions`, passed through
 `FilteredListToolbar`'s `searchSuggestions`; only `SceneList.tsx` sets it. While the field
@@ -589,7 +594,7 @@ width and then snaps to the real one, which showed as a glitch partway through t
 results' rise (on first load, and on switching views).
 
 Here the zoom level is a number of cards per row, the same on any screen: zoom 0–5 is
-6, 5, 4, 3, 2, 1 per row (`perRow`), capped at 4 on a tablet (below `lg`) and 2 on a phone
+6, 5, 4, 3, 2, 1 per row (`perRow`), capped at 4 on a tablet (below `lg`) and 1 on a phone
 (`xs`). `SceneGrid` sets `--scene-cards`; each card is `flex: 0 0 calc((100% - (n - 1) ×
 10px) / n)` in a wrapping flex row, so the browser sizes them before anything is drawn.
 A wrapping row rather than grid columns, so `justify-content: center` puts a short last

@@ -12,6 +12,13 @@ What this fork (`main-sugoi-ahegao`) changed on top of upstream stash, newest fi
 - What the fork's features are and how they work: [`docs/codebase/07-this-fork.md`](docs/codebase/07-this-fork.md).
   Why things are the way they are: [`docs/decisions/`](docs/decisions/).
 
+## 2026-11-24
+
+- tune(ui): open scenes instead of the landing page `e9b22f321`
+- tune(ui): one filter pill per row on phones `01ebbdc0c`
+- tune(ui): saved filters above the search on phones `577a2d902`
+- tune(ui): one scene per row on phones `a801bb598`
+
 ## 2026-11-23
 
 - feat(ui): rename PB theme to Blackhole and make it the default `a6deaf64b`

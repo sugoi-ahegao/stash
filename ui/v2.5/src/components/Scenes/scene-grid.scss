@@ -1,6 +1,6 @@
 // fork: the scene list's grid view (Scenes/SceneGrid.tsx). --scene-cards
 // cards per row (from the zoom level), each that share of the row's width,
-// at most 4 on a tablet and 2 on a phone. A wrapping row rather than grid
+// at most 4 on a tablet and 1 on a phone. A wrapping row rather than grid
 // columns, so a short last row sits in the middle. The gap stands in for the
 // cards' 5px margins.
 
@@ -36,7 +36,7 @@ $scene-grid-gap: 10px;
 // a phone
 @include media-breakpoint-down(xs) {
   .scene-grid {
-    --scene-grid-cards: min(var(--scene-cards), 2);
+    --scene-grid-cards: 1;
 
     margin: 5px 0;
   }

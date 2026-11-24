@@ -256,7 +256,7 @@ export const App: React.FC = () => {
       <ErrorBoundary>
         <Suspense fallback={<LoadingIndicator />}>
           <Switch>
-            <Redirect exact from="/" to="/landing" />
+            <Redirect exact from="/" to="/scenes" /> {/* fork */}
             <Route path="/landing" component={Landing} />
             <Route path="/home" component={FrontPage} />
             <Route path="/scenes" component={Scenes} />
